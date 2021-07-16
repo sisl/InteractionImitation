@@ -19,7 +19,7 @@ The INTERACTION dataset contains a two folders which should be copied into a fol
   - the contents of `recorded_trackfiles` should be copied to `./InteractionSimulator/datasets/trackfiles`
   - the contents of `maps` should be copied to `./InteractionSimulator/datasets/maps`
 
-# Package Structure
+## Package Structure
 ```
 InteractionImitation
 |- demos
