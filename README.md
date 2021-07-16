@@ -6,7 +6,6 @@ Clone InteractionSimulator and pip install the module.
 ```
 git clone https://github.com/sisl/InteractionSimulator.git
 cd InteractionSimulator
-git checkout v0.0.1
 pip install -e .
 cd ..
 export PYTHONPATH=$(pwd):$PYTHONPATH
