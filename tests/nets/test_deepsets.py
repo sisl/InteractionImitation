@@ -1,6 +1,7 @@
 import torch
 import random
 from src.nets import deepsets as ds
+import copy
 
 ds_config = {
     "input_dim": 5,
@@ -13,11 +14,17 @@ ds_config = {
         "hidden_n": 1,
         "hidden_dim": 10,
     },
-    "output_dim" : 1,
+    "output_dim" : 2,
 }
 
 def test_constructor():
     m = ds.DeepSetsModule.from_config(ds_config)
+    phi_config = copy.deepcopy(ds_config["phi"])
+    phi_config["input_dim"] = 5
+    phi_config["output_dim"] = 2
+    phi_config["final_activation"] = "sigmoid"
+    phi = ds.Phi.from_config(phi_config)
+    assert phi.final_activation == torch.nn.functional.sigmoid
 
 def test_phi():
     input_dim = 5

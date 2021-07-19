@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+from src.nets.util import parse_functional
+
 class DeepSetsModule(nn.Module):
     def __init__(self, input_dim, phi_hidden_n, phi_hidden_dim, latent_dim, rho_hidden_n, rho_hidden_dim, output_dim):
         """
@@ -70,7 +72,7 @@ class DeepSetsModule(nn.Module):
 
 
 class Phi(nn.Module):
-    def __init__(self, input_dim, hidden_n, hidden_dim, output_dim):
+    def __init__(self, input_dim, hidden_n, hidden_dim, output_dim, final_activation=None):
         """
         Fully connected feedforward network with same size for all hidden layers and ReLU activation
 
@@ -91,12 +93,19 @@ class Phi(nn.Module):
         # self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(hidden_n - 1)]
         # self.out_layer = nn.Linear(hidden_dim, output_dim)
         self.activation = nn.functional.relu
+        self.final_activation = final_activation if final_activation else self.activation
 
     def forward(self, x):
-        for layer in self.layers:
+        for layer in self.layers[:-1]:
             x = self.activation(layer(x))
+        x = self.final_activation(self.layers[-1](x))
         return x
 
     @staticmethod
     def from_config(config):
-        return Phi(config["input_dim"], config["hidden_n"], config["hidden_dim"], config["output_dim"])
+        args = (config["input_dim"], config["hidden_n"], config["hidden_dim"], config["output_dim"])
+        if "final_activation" in config:
+            kwargs = {"final_activation": parse_functional(config["final_activation"])}
+        else:
+            kwargs = {}
+        return Phi(*args, **kwargs)
