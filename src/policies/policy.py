@@ -16,12 +16,14 @@ class DeepSetsPolicy(Policy, nn.Module):
             path_config (dict): dictionary for configuring the path network
             head_config (dict): dictionary for configuring the common head network
         """
+        super(DeepSetsPolicy, self).__init__()
         self.ego_net = Phi.from_config(ego_config)
         self.deepsets = DeepSetsModule.from_config(dynamic_config)
         self.path_net = Phi.from_config(path_config)
-        self.head = Phi.from_config(path_config)
-        output_dim = self.ego_net.output_dim + self.deepsets.output_dim + self.path_net.output_dim
-        assert output_dim == head_config["input_dim"]
+        cat_dim = self.ego_net.output_dim + self.deepsets.output_dim + self.path_net.output_dim
+        # head has number of concatenated features as input
+        head_config["input_dim"] = cat_dim
+        self.head = Phi.from_config(head_config)
 
     def forward(self, ego_state, relative_states, path):
         """
@@ -38,7 +40,3 @@ class DeepSetsPolicy(Policy, nn.Module):
         x = torch.cat([x_ego, x_relative, x_path])
         x = self.head(x)
         return x
-
-
-
-
