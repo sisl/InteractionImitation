@@ -1,3 +1,4 @@
 tikzplotlib
 torch
-
+pytest
+json5
