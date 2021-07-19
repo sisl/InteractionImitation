@@ -6,7 +6,7 @@ import numpy as np
 
 import intersim
 from intersim.utils import get_map_path, get_svt, SVT_to_sim_stateactions
-
+from intersim import collisions
 import os
 opj = os.path.join
 
@@ -36,15 +36,29 @@ def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, *
     
     env.reset()
     done = False
-    obs, actions_taken = [], []
+    obs, actions_taken, max_devs = [], [], []
     i = 0
-    print(actions.shape)
-    while not done:
+    while not done and i < len(actions):
+        # check state deviation
+        env_state = env.projected_state
+        nni = ~torch.isnan(env_state[:,0])
+        norms = torch.norm(env_state[nni,:2]-states[i,nni,:2], dim=1)
+        max_devs.append(norms.max())
+        # print("Step: %04i, Maximum Deviation: %f m" %(i, max_devs[-1]))
+
+        # propagate environment
         ob, r, done, info = env.step(actions[i])
         obs.append(ob)
         actions_taken.append(info['action_taken'])
         i += 1
     
+    print("Maximum environment deviation from track: %f m" %(max(max_devs)))
+
+    # check for collisions
+    x = torch.stack([ob['state'] for ob in obs])
+    cols = collisions.check_collisions_trajectory(x, svt.lengths, svt.widths)
+    assert ~torch.any(cols), 'Error: Collisions found at indices {}'.format(cols.nonzero(as_tuple=True))
+
     # shift actions
     actions_taken.pop(0)
     obs.pop(-1)
