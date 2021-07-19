@@ -136,6 +136,7 @@ dmypy.json
 
 # Datasets
 datasets/
+expert_data/
 
 # Results
 experiments/results/

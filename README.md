@@ -19,6 +19,21 @@ The INTERACTION dataset contains a two folders which should be copied into a fol
   - the contents of `recorded_trackfiles` should be copied to `./InteractionSimulator/datasets/trackfiles`
   - the contents of `maps` should be copied to `./InteractionSimulator/datasets/maps`
 
+## Processing, saving, and loading expert demos
+Once the repository has been set up, you can process and save expert track demonstrations with:
+```
+python src/expert_data.py --loc [LOCNUM] --track [TRACKNUM]
+```
+
+You can then load the experts actions and observations using
+```
+from src import expert_data
+observations, actions = expert_data.load_expert_data(loc = [LOCNUM], track = [TRACKNUM])
+for (s, a) in zip (observations, actions):
+    # do some imitation learning
+```
+
+
 ## Package Structure
 ```
 InteractionImitation

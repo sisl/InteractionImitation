@@ -5,7 +5,7 @@ import gym
 import numpy as np
 
 import intersim
-from intersim.utils import get_map_path, get_svt, SVT_to_sim_stateactions
+from intersim.utils import get_map_path, get_svt, SVT_to_stateactions
 from intersim import collisions
 import os
 opj = os.path.join
@@ -28,7 +28,7 @@ def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, *
     osm = get_map_path(base='InteractionSimulator', loc=loc)
     print('SVT path: {}'.format(svt_path))
     print('Map path: {}'.format(osm))
-    states, actions = SVT_to_sim_stateactions(svt)
+    states, actions = SVT_to_stateactions(svt)
 
     # animate from environment
     env = gym.make('intersim:intersim-v0', svt=svt, map_path=osm, **kwargs, 
@@ -44,10 +44,9 @@ def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, *
         nni = ~torch.isnan(env_state[:,0])
         norms = torch.norm(env_state[nni,:2]-states[i,nni,:2], dim=1)
         max_devs.append(norms.max())
-        # print("Step: %04i, Maximum Deviation: %f m" %(i, max_devs[-1]))
 
         # propagate environment
-        ob, r, done, info = env.step(actions[i])
+        ob, r, done, info = env.step(env.target_state(svt.simstate[i+1]))
         obs.append(ob)
         actions_taken.append(info['action_taken'])
         i += 1
