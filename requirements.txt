@@ -1,4 +1,5 @@
 tikzplotlib
 torch
+sklearn
 pytest
 json5
