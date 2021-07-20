@@ -15,6 +15,14 @@ def test_deepsets_policy():
 
     ego_state = torch.rand(ns)
     relative_state = torch.rand(nv, ns)
-    path = torch.rand(npath, 2)
+    path_x = torch.rand(npath)
+    path_y = torch.rand(npath)
+
+    sample = {
+        "state": ego_state,
+        "relative_state": relative_state,
+        "path_x": path_x,
+        "path_y": path_y,
+    }
     
-    module(ego_state, relative_state, path)
+    module(sample)
