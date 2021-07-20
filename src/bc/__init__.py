@@ -1,1 +1,1 @@
-from src.bc.bc import BehaviorCloningPolicy, train, load_policy, metrics
+from src.bc.bc import BehaviorCloningPolicy, train
