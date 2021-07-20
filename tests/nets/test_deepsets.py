@@ -2,6 +2,7 @@ import torch
 import random
 from src.nets import deepsets as ds
 import copy
+import numpy as np
 
 ds_config = {
     "input_dim": 5,
@@ -44,34 +45,69 @@ def test_deepsets():
     m = ds.DeepSetsModule.from_config(ds_config)
 
     input_dim = ds_config["input_dim"]
-    n_dynamic = random.randint(5, 15)
-    x = torch.rand(n_dynamic, input_dim)
+    B = 50
+    max_V = 10
+    batch = []
+    for i in range(B):
+        if i==0: # ensure that there is an example with no vehicles
+            n_dynamic = 0
+        elif i==1: # and one with full vehicles
+            n_dynamic = max_V
+        else:
+            n_dynamic = random.randint(1, max_V)
+        x = torch.rand(n_dynamic, input_dim)
+        n_nan = max_V - n_dynamic
+        x = torch.cat([x, torch.zeros(n_nan, input_dim) * np.nan])
+        assert x.shape == torch.Size([max_V, input_dim])
+        batch.append(x)
+    batch = torch.stack(batch)
+    assert batch.shape == torch.Size([B, max_V, input_dim])
 
-    n_batch = 20
-    x = x.unsqueeze(0).expand(n_batch, n_dynamic, input_dim)
+    y = m(batch)
+    assert y.shape == torch.Size([B, ds_config["output_dim"]])
+    assert torch.isnan(y).sum() == 0
 
-    y = m(x)
-    assert y.shape == torch.Size([n_batch, ds_config["output_dim"]])
-
-    for i in range(n_batch):
-        assert torch.allclose(y[i], y[0])
+    for i in range(B):
+        y = m(batch[i])
+        assert y.shape == torch.Size([ds_config["output_dim"]])
+        assert torch.isnan(y).sum() == 0
 
 def test_deepsets_computation():
-    n_dynamic = random.randint(5,15)
-    n_batch = 7
     input_dim = 5
-    output_dim = 3
-    x = torch.rand(n_dynamic, input_dim)
-    x = x.unsqueeze(0).expand(n_batch, n_dynamic, input_dim)
-    assert x.shape == torch.Size([n_batch, n_dynamic, input_dim])
+    latent_dim = 8
 
-    phi = torch.nn.Linear(input_dim, output_dim)
+    B = 20
+    max_V = 10
+    batch = []
+    for i in range(B):
+        if i==0: # TODO: Set to i==0
+            n_dynamic = 0
+        else:
+            n_dynamic = random.randint(1, max_V)
+        x = torch.rand(n_dynamic, input_dim)
+        n_nan = max_V - n_dynamic
+        x = torch.cat([x, torch.zeros(n_nan, input_dim) * np.nan])
+        assert x.shape == torch.Size([max_V, input_dim])
+        batch.append(x)
+    batch = torch.stack(batch)
+    assert batch.shape == torch.Size([B, max_V, input_dim])
+    x = batch
 
-    y = torch.stack(tuple(phi(instance) for instance in x.unbind(-2)), dim=-2)
-    assert y.shape == torch.Size([n_batch, n_dynamic, output_dim])
+    ### create phi
+    phi = ds.Phi(input_dim, 1, 10, latent_dim)
 
-    y = y.sum(dim=-2)
-    assert y.shape == torch.Size([n_batch, output_dim])
+    max_nv = x.shape[-2]
+    input_mask = ~torch.isnan(x)
+    batch_dynamic_mask = torch.all(input_mask, dim=-1)
+    assert batch_dynamic_mask.shape == x.shape[:-1]
+    batch_mask = torch.all(batch_dynamic_mask, dim=-1)
+    assert batch_mask.shape == x.shape[:-2]
 
-    for i in range(n_batch):
-        assert torch.allclose(y[i], y[0])
+    batch_dims = x.shape[:-2]
+    latent = torch.zeros([*batch_dims, max_nv, latent_dim])
+    latent[batch_dynamic_mask] = phi(x[batch_dynamic_mask])
+    assert x[batch_dynamic_mask].shape == torch.Size([batch_dynamic_mask.sum(), input_dim])
+    assert phi(x[batch_dynamic_mask]).shape == torch.Size([batch_dynamic_mask.sum(), latent_dim])
+
+    latent = latent.sum(dim=-2)
+    assert latent.shape == torch.Size([B, latent_dim])
