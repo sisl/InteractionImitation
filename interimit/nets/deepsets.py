@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from src.nets.util import parse_functional
+from interimit.nets.util import parse_functional
 
 class DeepSetsModule(nn.Module):
     def __init__(self, input_dim, phi_hidden_n, phi_hidden_dim, latent_dim, rho_hidden_n, rho_hidden_dim, output_dim):

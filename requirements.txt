@@ -2,3 +2,5 @@ tikzplotlib
 torch
 pytest
 json5
+gym
+git+https://github.com/sisl/InteractionSimulator

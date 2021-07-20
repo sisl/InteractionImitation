@@ -2,7 +2,7 @@
 import torch
 from torch import nn
 
-from src.nets.deepsets import DeepSetsModule, Phi
+from interimit.nets.deepsets import DeepSetsModule, Phi
 
 class Policy:
     pass
