@@ -1,6 +1,6 @@
 import torch
 import random
-from src.nets import deepsets as ds
+from interimit.nets import deepsets as ds
 import copy
 
 ds_config = {

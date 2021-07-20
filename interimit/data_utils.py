@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 #from torchvision import transforms, utils
-from src.expert_data import load_expert_data
+from interimit.expert_data import load_expert_data
 import os
 opj = os.path.join
 

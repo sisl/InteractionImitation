@@ -1,5 +1,5 @@
 import torch
-from src.policies.policy import DeepSetsPolicy
+from interimit.policies.policy import DeepSetsPolicy
 import json5
 
 config_path = "config/networks.json5"
