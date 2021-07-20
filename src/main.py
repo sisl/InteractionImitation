@@ -37,31 +37,31 @@ def main(method='bc', train=False, test=False, loc=0, **kwargs):
     # method-based training
     if method=='bc':
         from src import bc
-        policy = bc.BehaviorCloningPolicy(transforms=transforms, **kwargs)
-        load_policy = bc.load_policy
-        metrics = bc.metrics
-        train = bc.train
+        policy_class = bc.BehaviorCloningPolicy
+        load_policy_fn = bc.load_policy
+        metrics_fn = bc.metrics
+        train_fn = bc.train
     else:
         raise NotImplementedError
     
     # default train / cv / test split datasets 
     if train:
-        train_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[0,1,2], transforms=transforms, train=True)
-        cv_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[3], transforms=transforms)
-        train(train_dataset, cv_dataset, policy, filestr=filestr, **kwargs)
+        train_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[0,1,2])
+        cv_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[3])
+        train_fn(train_dataset, cv_dataset, policy_class, filestr=filestr, **kwargs)
     
     if test:
 
         # load policy 
-        policy = load_policy(filestr=filestr)
+        policy = load_policy_fn(filestr=filestr)
 
         # simulate policy
         test_track = 4
         simulate_policy(policy, loc=loc, track=track, filestr=filestr)
 
         # run test metrics
-        # test_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[4], transforms=transforms, train=False)
-        # metrics(test_datset, policy)
+        # test_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[4])
+        # metrics_fn(test_dataset, policy)
 
 
 def simulate_policy(policy, loc=0, track=0, filestr=''):
