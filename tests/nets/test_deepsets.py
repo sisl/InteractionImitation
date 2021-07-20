@@ -80,7 +80,7 @@ def test_deepsets_computation():
     max_V = 10
     batch = []
     for i in range(B):
-        if i==0: # TODO: Set to i==0
+        if i==0:
             n_dynamic = 0
         else:
             n_dynamic = random.randint(1, max_V)
