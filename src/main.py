@@ -30,14 +30,11 @@ def main(method='bc', train=False, test=False, loc=0, **kwargs):
     if not os.path.isdir(outdir):
         os.mkdir(outdir)
     filestr = opj(outdir, basestr(**kwargs))
-   
-
     
     # method-based training
     if method=='bc':
         from src import bc
         policy_class = bc.BehaviorCloningPolicy
-        load_policy_fn = bc.load_policy
         train_fn = bc.train
     else:
         raise NotImplementedError
@@ -51,7 +48,8 @@ def main(method='bc', train=False, test=False, loc=0, **kwargs):
     if test:
 
         # load policy 
-        policy = load_policy_fn(filestr=filestr)
+        policy = policy_class.load_model(filestr=filestr, **kwargs)
+        policy.eval()
 
         # simulate policy
         test_track = 4
