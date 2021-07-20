@@ -24,7 +24,11 @@ def test_constructor():
     phi_config["output_dim"] = 2
     phi_config["final_activation"] = "sigmoid"
     phi = ds.Phi.from_config(phi_config)
-    assert phi.final_activation == torch.nn.functional.sigmoid
+    assert phi.final_activation == torch.sigmoid
+
+    phi_config["final_activation"] = "relu"
+    phi = ds.Phi.from_config(phi_config)
+    assert phi.final_activation == torch.nn.functional.relu
 
 def test_phi():
     input_dim = 5
