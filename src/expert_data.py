@@ -91,5 +91,11 @@ if __name__ == '__main__':
                        help='location (default 0)')
     parser.add_argument('--track', default=0, type=int,
                        help='track number (default 0)')
+    parser.add_argument('--all-tracks', action='store_true',
+                       help='whether to process all tracks at location')
     args = parser.parse_args()
-    generate_expert_data(loc=args.loc,track=args.track)
+    if args.all_tracks:
+        for i in range(intersim.MAX_TRACKS):
+            generate_expert_data(loc=args.loc, track=i)
+    else:
+        generate_expert_data(loc=args.loc,track=args.track)
