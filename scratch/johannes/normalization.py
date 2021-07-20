@@ -1,38 +1,73 @@
 import torch
-import torchvision
+from torch import nn
 
-from torchvision import transforms
-from torch.utils.data import DataLoader
+from sklearn import preprocessing
 
-train_set = torchvision.datasets.FashionMNIST(
-    root='./data'
-    ,train=True
-    ,download=True
-    ,transform=transforms.Compose([
-        transforms.ToTensor()
-    ])
-)
+class Normalization(nn.Module):
+    def __init__(self, X):
+        super(Normalization, self).__init__()
+        self.fit(X)
 
-loader = DataLoader(train_set, batch_size=len(train_set), num_workers=1)
-# load whole dataset
-input_data, out_data = next(iter(loader))
-out_data = out_data.float()
-# compute mean and std only over batch dimension
-m_in, s_in = input_data.mean(dim=0), input_data.std(dim=0)
-m_out, s_out = out_data.mean(dim=0), out_data.std(dim=0)
+    def fit(self, X):
+        raise NotImplementedError('Please implement fit()')
 
-input_tf = transforms.Normalize(m_in, s_in)
-out_tf = transforms.Normalize(m_out, s_out)
+    def transform(self, X):
+        raise NotImplementedError('Please implement transform()')
 
-transformed_input = input_tf(input_data)
-transformed_output = torch.sigmoid(out_tf(out_data))
+    def inverse_transform(self, X):
+        raise NotImplementedError('Please implement inverse_transform()')
 
-# scale sigmoid output [0, 1] to acceleration interval [a_min, a_max]
-a_min, a_max = (-4, 2)
-# compute m and s such that normalization with m and s results in desired scaling
-s = 1 / (a_max - a_min)
-m = - s * a_min
-scaling = transforms.Normalize(m, s)
+    def forward(self, X):
+        return self.transform(X)
 
-# DOES NOT WORK SINCE TORCHVISION NORMALIZE WORKS ONLY ON IMAGES
-scaled_output = scaling(transformed_output)
+class SciKitNormalization(Normalization):
+    def __init__(self, tf, X):
+        self.tf = tf
+        super(SciKitNormalization, self).__init__(X)
+
+    def fit(self, X):
+        self.tf.fit(X)
+
+    def transform(self, X):
+        return torch.tensor(self.tf.transform(X), dtype=torch.float)
+
+    def inverse_transform(self, X):
+        return torch.tensor(self.tf.inverse_transform(X), dtype=torch.float)
+
+class SciKitStandardization(SciKitNormalization):
+    def __init__(self, X):
+        super(SciKitStandardization, self).__init__(preprocessing.StandardScaler(), X)
+
+class SciKitMinMaxScaler(SciKitNormalization):
+    def __init__(self, X):
+        super(SciKitMinMaxScaler, self).__init__(preprocessing.MinMaxScaler(), X)
+
+
+ns = 5
+na = 1
+n_batch = 1000
+
+state = torch.rand(n_batch, ns)
+action = torch.rand(n_batch, na)
+
+s_tf = SciKitStandardization(state)
+a_tf = SciKitMinMaxScaler(action)
+
+print(torch.linalg.norm(s_tf.inverse_transform(s_tf(state)) - state))
+print(torch.linalg.norm(a_tf.inverse_transform(a_tf(action)) - action))
+
+
+
+
+# class Foo:
+#     def __init__(self):
+#         return None
+#     def baz(self):
+#         print("Foo.baz()")
+
+# class Bar(Foo):
+#     def __init__(self):
+#         return None
+
+# bar = Bar()
+# bar.baz()
