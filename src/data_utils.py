@@ -1,7 +1,6 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import numpy as np
-#from torchvision import transforms, utils
 from src.expert_data import load_expert_data
 import os
 opj = os.path.join
@@ -15,24 +14,16 @@ class InteractionDatasetMultiAgent(Dataset):
 class InteractionDatasetSingleAgent(Dataset):
     """Class to load states and actions for individual agents."""
 
-    def __init__(self, output_dir='expert_data', loc:int = 0, tracks:list = [0], transforms={}):
+    def __init__(self, output_dir='expert_data', loc:int = 0, tracks:list = [0]):
         """
         Args:
             output_dir (string): Directory with all the images.
             loc (int): location index
             tracks (list[int]): track indices
-            transforms (dict): dictionary of transforms to apply to different variables
         """
         self.output_dir = output_dir
         self.loc = loc
         self.tracks = tracks
-        self.transforms = transforms
-        #self.action_transform = transforms.get('action', None)
-        #self.state_transform = transforms.get('state', None)
-        #self.relative_state_transform = transforms.get('relative_state', None)
-        #self.paths_x_transform = transforms.get('paths_x', None)
-        #self.paths_y_transform = transform.get('paths_y',None)
-
         self._load_dataset()
 
     def _load_dataset(self):
@@ -95,9 +86,4 @@ class InteractionDatasetSingleAgent(Dataset):
         """
         keys = ['state', 'relative_state', 'path_x', 'path_y', 'action']
         sample = {key:self.raw_data[key][idx] for key in keys}
-
-        for key in keys: 
-            if key in self.transforms.keys():
-                sample[key] = self.transforms[key](sample[key])
-
         return sample
