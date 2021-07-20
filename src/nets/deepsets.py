@@ -61,7 +61,7 @@ class DeepSetsModule(nn.Module):
         # use negative dynamic_dim since batch dimensions are inserted at the front
         dynamic_dim = -2
         # iterate over dynamic dimension to apply phi to every instance
-        latent = tuple(self.phi(instance) for instance in x.unbind(dynamic_dim))
+        latent = tuple(self.phi(instance) for instance in x.unbind(dynamic_dim) if torch.all(~torch.isnan(instance)))
         # stack outputs of phi
         latent = torch.stack(latent, dim=dynamic_dim)
         # apply pooling function to reduce dynamic dimension
