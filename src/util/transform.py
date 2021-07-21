@@ -43,30 +43,49 @@ class SciKitTransform(Transform):
     """
     Wrappers around scikit-learn transforms
     """
-    def __init__(self, tf):
+    def __init__(self, tf, reduce_dim:int=None):
+        """
+        Initialize SciKitTransform
+        Args:
+            tf: transform
+            reduce_dim (int): dimension to start calculating featues from
+                e.g. with reduce_dim=2, (A, B, C, D, E) will be reshaped to (A*B, C*D*E)
+        """
         self.tf = tf
+        self.reduce_dim
         super(SciKitTransform, self).__init__()
 
     def fit(self, X):
-        self.tf.fit(X)
+        nd = X.ndim
+        if self.reduce_dim:
+            self.nfeatures = X.shape[reduce_dim:].prod()
+        else:
+            assert nd==2, 'Invalid ndim'
+            self.nfeatures = X.shape[1]
+
+        self.tf.fit(X.reshape((-1,selfnfeatures)))
 
     def transform(self, X):
-        return torch.tensor(self.tf.transform(X), dtype=torch.float)
+        shape = X.shape
+        t = torch.tensor(self.tf.transform(X.reshape((-1,selfnfeatures))), dtype=torch.float)
+        return t.reshape(shape)
 
     def inverse_transform(self, X):
-        return torch.tensor(self.tf.inverse_transform(X), dtype=torch.float)
+        shape = X.shape
+        it =  torch.tensor(self.tf.inverse_transform(X.reshape((-1,selfnfeatures))), dtype=torch.float)
+        return it.reshape(shape)
 
-class SciKitStandardScaler(SciKitNormalization):
+class SciKitStandardScaler(SciKitTransform):
     """
     Wrapper around scikit-learn's StandardScaler for standardizing each feature individually.
     """
-    def __init__(self):
-        super(SciKitStandardScaler, self).__init__(preprocessing.StandardScaler())
+    def __init__(self, **kwargs):
+        super(SciKitStandardScaler, self).__init__(preprocessing.StandardScaler(), **kwargs)
 
-class SciKitMinMaxScaler(SciKitNormalization):
+class SciKitMinMaxScaler(SciKitTransform):
     """
     Wrapper around scikit-learn's MinMaxScaler for scaling features to [0, 1] individually.
     """
-    def __init__(self):
-        super(SciKitMinMaxScaler, self).__init__(preprocessing.MinMaxScaler())
+    def __init__(self, **kwargs):
+        super(SciKitMinMaxScaler, self).__init__(preprocessing.MinMaxScaler(), **kwargs)
 
