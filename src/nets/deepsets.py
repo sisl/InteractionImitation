@@ -17,10 +17,11 @@ class DeepSetsModule(nn.Module):
         """
         super(DeepSetsModule, self).__init__()
         self.input_dim = input_dim
+        self.latent_dim = latent_dim
         self.output_dim = output_dim
-        self.phi = Phi(self.input_dim, phi_hidden_n, phi_hidden_dim, latent_dim)
-        self.rho = Phi(latent_dim, rho_hidden_n, rho_hidden_dim, self.output_dim)
-        self.pooling = torch.sum  # torch.max # torch.mean
+        self.phi = Phi(self.input_dim, phi_hidden_n, phi_hidden_dim, self.latent_dim)
+        self.rho = Phi(self.latent_dim, rho_hidden_n, rho_hidden_dim, self.output_dim)
+        self.pooling = torch.sum
 
     @staticmethod
     def from_config(config):
@@ -54,18 +55,22 @@ class DeepSetsModule(nn.Module):
     def forward(self, x):
         """
         Args:
-            x (torch.tensor): (batch_size, dynamic_size, input_dim)
+            x (torch.tensor): ([B, ]max_nv, d)
         Returns:
-            y (torch.tensor): (batch_size, output_dim)
+            y (torch.tensor): ([B, ]output_dim)
         """
-        # use negative dynamic_dim since batch dimensions are inserted at the front
-        dynamic_dim = -2
-        # iterate over dynamic dimension to apply phi to every instance
-        latent = tuple(self.phi(instance) for instance in x.unbind(dynamic_dim))
-        # stack outputs of phi
-        latent = torch.stack(latent, dim=dynamic_dim)
-        # apply pooling function to reduce dynamic dimension
-        latent = self.pooling(latent, dim=dynamic_dim)
+        # mask for selecting only those batches and vehicles where all relative states are not nan
+        # shape (B, max_nv)
+        notnan_mask = torch.all(~torch.isnan(x), dim=-1)
+        # create zero tensor of shape (B, max_nv, latent_dim) to store phi evaluations in
+        latent = torch.zeros([*x.shape[:-1], self.latent_dim])
+        # evaluate phi for all not NaN entries
+        # x[batch_dynamic_mask] has shape (notnan_mask.sum(), input_dim)
+        latent[notnan_mask] = self.phi(x[notnan_mask])
+
+        # sum over relative state dimension
+        latent = self.pooling(latent, dim=-2)
+        
         # apply rho network
         y = self.rho(latent)
         return y
