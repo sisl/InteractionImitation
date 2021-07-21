@@ -93,7 +93,7 @@ class Phi(nn.Module):
         # self.hidden_layers = [nn.Linear(hidden_dim, hidden_dim) for _ in range(hidden_n - 1)]
         # self.out_layer = nn.Linear(hidden_dim, output_dim)
         self.activation = nn.functional.relu
-        self.final_activation = final_activation if final_activation else self.activation
+        self.final_activation = final_activation if final_activation else lambda x: x
 
     def forward(self, x):
         for layer in self.layers[:-1]:
