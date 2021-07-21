@@ -2,8 +2,11 @@ import torch
 import gym
 import intersim
 import numpy as np
+import json5
 import os
 opj = os.path.join
+
+
 from src import InteractionDatasetSingleAgent, metrics
 
 def basestr(**kwargs):
@@ -16,7 +19,7 @@ def basestr(**kwargs):
     """
     return 'base_'
 
-def main(method='bc', train=False, test=False, loc=0, **kwargs):
+def main(method='bc', train=False, test=False, loc=0, config_path=None, **kwargs):
     """
     Main loop for training and testing different imitation models
     Args:
@@ -24,13 +27,26 @@ def main(method='bc', train=False, test=False, loc=0, **kwargs):
         test (bool): whether to run test loop
         method (str): the method to try for imitation
         loc (int): the location index of the roundabout
-        kwargs (dict): remaining kwargs for policy and training loop
+        config_file (str): path to config file
+        kwargs (dict): remaining kwargs for training loop
     """
+    # get/set seed
+    seed = kwargs.get('seed',0)
+    torch.manual_seed(seed)
+
+    # make prefix of output files
     outdir = opj('output',method,'loc%02i'%(loc))
     if not os.path.isdir(outdir):
         os.mkdir(outdir)
     filestr = opj(outdir, basestr(**kwargs))
     
+    # load config
+    if config_path:
+        with open(config_path, 'r') as cfg:
+            config = json5.load(cfg)
+    else:
+        raise Exception('No config path specified')
+
     # method-based training
     if method=='bc':
         from src import bc
@@ -41,14 +57,17 @@ def main(method='bc', train=False, test=False, loc=0, **kwargs):
     
     # default train / cv / test split datasets 
     if train:
+
+        # make policy, train and test datasets, and send to 
+        policy = policy_class(config)
         train_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[0,1,2])
         cv_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[3])
-        train_fn(train_dataset, cv_dataset, policy_class, filestr=filestr, **kwargs)
+        train_fn(train_dataset, cv_dataset, policy, filestr, **kwargs)
     
     if test:
 
         # load policy 
-        policy = policy_class.load_model(filestr=filestr, **kwargs)
+        policy = policy_class.load_model(config, filestr)
         policy.eval()
 
         # simulate policy
@@ -77,6 +96,7 @@ def simulate_policy(policy, loc=0, track=0, filestr=''):
     env.render()
     done = False
     while not done: 
+        
         # get action
         action = policy(ob)
 
@@ -95,6 +115,8 @@ def parse_args():
             test (bool): whether to run test loop
             method (str): the method to try for imitation
             loc (int): the location index of the roundabout
+            config (str): config path
+            seed (int): RNG seed
     """
     import argparse
     parser = argparse.ArgumentParser(description='Save Expert Trajectories')
@@ -105,7 +127,11 @@ def parse_args():
     parser.add_argument("--test", help="test model",
         action="store_true") 
     parser.add_argument("--method", help="modeling method",
-        choices=['bc', 'gail', 'advil'], default='bc')        
+        choices=['bc', 'gail', 'advil'], default='bc')
+    parser.add_argument("--config", help="config file path",
+        default='config/networks.json5', type=str)
+    parser.add_argument('--seed', default=0, type=int,
+        help='seed')    
     parser.add_argument()              
     parser.add_argument()
     args = parser.parse_args()
@@ -113,7 +139,9 @@ def parse_args():
         'train'=args.train, 
         'test'=args.test, 
         'method'=args.method,
-        'loc'=args.loc
+        'loc'=args.loc,
+        'config'=args.config,
+        'seed'=args.seed
     }
     return kwargs
 
