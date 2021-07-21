@@ -43,7 +43,8 @@ def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, *
         env_state = env.projected_state
         nni = ~torch.isnan(env_state[:,0])
         norms = torch.norm(env_state[nni,:2]-states[i,nni,:2], dim=1)
-        max_devs.append(norms.max())
+        if len(norms)>0:
+            max_devs.append(norms.max())
 
         # propagate environment
         ob, r, done, info = env.step(env.target_state(svt.simstate[i+1]))

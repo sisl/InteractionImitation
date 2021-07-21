@@ -35,7 +35,7 @@ def average_velocity(x):
     """
     pass
 
-def divergence(p, q, type='kl')
+def divergence(p, q, type='kl'):
     """
     Calculate a divergence between p and q
     Args:

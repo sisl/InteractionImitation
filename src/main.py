@@ -37,7 +37,7 @@ def main(method='bc', train=False, test=False, loc=0, config_path=None, **kwargs
     # make prefix of output files
     outdir = opj('output',method,'loc%02i'%(loc))
     if not os.path.isdir(outdir):
-        os.mkdir(outdir)
+        os.makedirs(outdir)
     filestr = opj(outdir, basestr(**kwargs))
     
     # load config
@@ -60,7 +60,7 @@ def main(method='bc', train=False, test=False, loc=0, config_path=None, **kwargs
 
         # make policy, train and test datasets, and send to 
         policy = policy_class(config)
-        train_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[0,1,2])
+        train_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[0])#,1,2])
         cv_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[3])
         train_fn(train_dataset, cv_dataset, policy, filestr, **kwargs)
     
@@ -71,11 +71,11 @@ def main(method='bc', train=False, test=False, loc=0, config_path=None, **kwargs
         policy.eval()
 
         # simulate policy
-        test_track = 4
+        track = 4
         simulate_policy(policy, loc=loc, track=track, filestr=filestr)
 
         # run test metrics
-        test_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[4])
+        test_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[track])
         metrics(filestr, test_dataset, policy)
 
 
@@ -132,16 +132,14 @@ def parse_args():
         default='config/networks.json5', type=str)
     parser.add_argument('--seed', default=0, type=int,
         help='seed')    
-    parser.add_argument()              
-    parser.add_argument()
     args = parser.parse_args()
     kwargs = {
-        'train'=args.train, 
-        'test'=args.test, 
-        'method'=args.method,
-        'loc'=args.loc,
-        'config'=args.config,
-        'seed'=args.seed
+        'train':args.train, 
+        'test':args.test, 
+        'method':args.method,
+        'loc':args.loc,
+        'config_path':args.config,
+        'seed':args.seed
     }
     return kwargs
 

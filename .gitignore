@@ -140,6 +140,7 @@ expert_data/
 
 # Results
 experiments/results/
+output/
 
 # Dependencies
 InteractionSimulator/

@@ -52,27 +52,27 @@ class SciKitTransform(Transform):
                 e.g. with reduce_dim=2, (A, B, C, D, E) will be reshaped to (A*B, C*D*E)
         """
         self.tf = tf
-        self.reduce_dim
+        self.reduce_dim = reduce_dim
         super(SciKitTransform, self).__init__()
 
     def fit(self, X):
         nd = X.ndim
         if self.reduce_dim:
-            self.nfeatures = X.shape[reduce_dim:].prod()
+            self.nfeatures = int(torch.tensor(X.shape[self.reduce_dim:]).prod())
         else:
             assert nd==2, 'Invalid ndim'
             self.nfeatures = X.shape[1]
 
-        self.tf.fit(X.reshape((-1,selfnfeatures)))
+        self.tf.fit(X.reshape((-1,self.nfeatures)))
 
     def transform(self, X):
         shape = X.shape
-        t = torch.tensor(self.tf.transform(X.reshape((-1,selfnfeatures))), dtype=torch.float)
+        t = torch.tensor(self.tf.transform(X.reshape((-1,self.nfeatures))), dtype=torch.float)
         return t.reshape(shape)
 
     def inverse_transform(self, X):
         shape = X.shape
-        it =  torch.tensor(self.tf.inverse_transform(X.reshape((-1,selfnfeatures))), dtype=torch.float)
+        it =  torch.tensor(self.tf.inverse_transform(X.reshape((-1,self.nfeatures))), dtype=torch.float)
         return it.reshape(shape)
 
 class SciKitStandardScaler(SciKitTransform):

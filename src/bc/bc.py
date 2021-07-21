@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, RandomSampler
 import pickle
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 
 from src.policies import DeepSetsPolicy
 from src.util.transform import SciKitMinMaxScaler
@@ -13,7 +13,7 @@ class BehaviorCloningPolicy():
     Class for (continuous) behavior cloning policy
     """
     
-    def __init__(self, config: dict transforms: dict={}):
+    def __init__(self, config: dict, transforms: dict={}):
         """
         Initialize BehaviorCloningPolicy
         Args:
@@ -29,7 +29,7 @@ class BehaviorCloningPolicy():
         return self._transforms
     
     @transforms.setter
-    def transforms(self, transforms)
+    def transforms(self, transforms):
         self._transforms=transforms
 
     def __call__(self, ob):
@@ -93,11 +93,11 @@ def generate_transforms(dataset):
         dataset (Dataset): dataset of demo observations and actions
     """
     transforms = {
-        'action': SciKitMinMaxScaler()
-        'state': SciKitMinMaxScaler()
-        'relative_state': SciKitMinMaxScaler(reduce_dim=2)
-        'path_x': SciKitMinMaxScaler(reduce_dim=2)
-        'path_y': SciKitMinMaxScaler(reduce_dim=2)
+        'action': SciKitMinMaxScaler(),
+        'state': SciKitMinMaxScaler(),
+        'relative_state': SciKitMinMaxScaler(reduce_dim=2),
+        'path_x': SciKitMinMaxScaler(reduce_dim=2),
+        'path_y': SciKitMinMaxScaler(reduce_dim=2),
     }
     for key in transforms.keys():
         transforms[key].fit(dataset[:][key])
@@ -126,6 +126,8 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
 
     # generate loss function, optimizer
     loss_fn = nn.HuberLoss(reduction='sum')
+    import pdb
+    pdb.set_trace()
     optimizer = torch.optim.Adam(policy.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
     for i in train_epochs:
@@ -156,5 +158,5 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
                     loss = loss_fn(pred_action, batch['action'])
                     cv_loss += loss.item() / len(cv_dataset)
             print('Epoch: {}, CV Loss: {}'.format(i, cv_loss))
-            
+
     policy.save_model(filestr)
