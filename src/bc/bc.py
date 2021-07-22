@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import DataLoader
 import pickle
 #from torch.utils.tensorboard import SummaryWriter
 
 from src.policies import DeepSetsPolicy
-from src.util.transform import SciKitMinMaxScaler
+from src.util.transform import MinMaxScaler
 import json5
 
 class BehaviorCloningPolicy():
@@ -101,11 +101,11 @@ def generate_transforms(dataset):
         dataset (Dataset): dataset of demo observations and actions
     """
     transforms = {
-        'action': SciKitMinMaxScaler(),
-        'state': SciKitMinMaxScaler(),
-        'relative_state': SciKitMinMaxScaler(reduce_dim=2),
-        'path_x': SciKitMinMaxScaler(reduce_dim=2),
-        'path_y': SciKitMinMaxScaler(reduce_dim=2),
+        'action': MinMaxScaler(),
+        'state': MinMaxScaler(),
+        'relative_state': MinMaxScaler(reduce_dim=2),
+        'path_x': MinMaxScaler(reduce_dim=2),
+        'path_y': MinMaxScaler(reduce_dim=2),
     }
     for key in transforms.keys():
         transforms[key].fit(dataset[:][key])
@@ -151,7 +151,7 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
 
             # compute loss and step optimizer
             optimizer.zero_grad()
-            loss.backwards()
+            loss.backward()
             optimizer.step()
 
             epoch_loss += loss.item() / len(train_dataset)
