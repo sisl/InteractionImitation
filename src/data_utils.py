@@ -43,11 +43,11 @@ class InteractionDatasetSingleAgent(Dataset):
             for t in range(T):
                 nni = ~torch.isnan(observations[t]['state'][:,0])
                 max_nv = max(max_nv,nni.count_nonzero())
-                self.raw_data['state'].append(observations[t]['state'][nni])
-                self.raw_data['relative_state'].append(observations[t]['relative_state'][nni.nonzero(),nni.nonzero()])
-                self.raw_data['action'].append(actions[t][nni])
-                self.raw_data['path_x'].append(observations[t]['paths'][0][nni])
-                self.raw_data['path_y'].append(observations[t]['paths'][1][nni])
+                self.raw_data['state'].append(observations[t]['state'][nni].float())
+                self.raw_data['relative_state'].append(observations[t]['relative_state'][nni.nonzero(),nni.nonzero()].float())
+                self.raw_data['action'].append(actions[t][nni].float())
+                self.raw_data['path_x'].append(observations[t]['paths'][0][nni].float())
+                self.raw_data['path_y'].append(observations[t]['paths'][1][nni].float())
 
         # cat lists
         self.raw_data['state'] = torch.cat(self.raw_data['state'])

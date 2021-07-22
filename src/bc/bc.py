@@ -22,7 +22,7 @@ class BehaviorCloningPolicy():
         """
         self._config = config
         self._transforms = transforms
-        self._policy_model = DeepSetsPolicy(config["ego_state"], config["deepsets"], config["path_encoder"], config["head"])
+        self._policy = DeepSetsPolicy(config["ego_state"], config["deepsets"], config["path_encoder"], config["head"])
         
     @property
     def transforms(self):
@@ -32,9 +32,17 @@ class BehaviorCloningPolicy():
     def transforms(self, transforms):
         self._transforms=transforms
 
+    @property 
+    def policy(self):
+        return self._policy
+    
+    @policy.setter
+    def policy(self, policy):
+        self._policy = policy
+
     def __call__(self, ob):
 
-        if 'actions' in ob.keys():
+        if 'action' in ob.keys():
             # extract state from dataloader samples  
             pass
         else:
@@ -48,7 +56,7 @@ class BehaviorCloningPolicy():
                 ob[key] = self._transforms[key].transform(ob[key])
 
         # run transformed state through model
-        action = self._policy_model(ob)
+        action = self._policy(ob)
         assert action.ndim == 2, 'action has incorrect shape'
 
         # untransform action
@@ -68,14 +76,14 @@ class BehaviorCloningPolicy():
         """
         transforms = pickle.load(open(filestr+'_transforms.pkl', 'rb'))
         model = cls(config, transforms=transforms)
-        model._policy_model.load_state_dict(torch.load(filestr+'_model.pt'))
+        model._policy.load_state_dict(torch.load(filestr+'_model.pt'))
         return model
     
     def eval(self):
-        self._policy_model.eval()
+        self._policy.eval()
 
     def parameters(self):
-        return self._policy_model.parameters()
+        return self._policy.parameters()
 
     def save_model(self, filestr):
         """
@@ -84,7 +92,7 @@ class BehaviorCloningPolicy():
             filestr (str): string prefix to save model to
         """
         pickle.dump(self._transforms, open(filestr+'_transforms.pkl', 'wb'))
-        torch.save(self._policy_model.state_dict(), filestr+'_model.pt')
+        torch.save(self._policy.state_dict(), filestr+'_model.pt')
 
 def generate_transforms(dataset):
     """
@@ -112,7 +120,7 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
     train_batch_size = 64
     cv_batch_size = 256 # doesn't matter
     learning_rate = 1e-3
-    weight_decay=0.1
+    weight_decay = 0.1
 
     # generate transform from train_dataset
     transforms = generate_transforms(train_dataset)
@@ -124,16 +132,19 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
     training_loader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
     cv_loader = DataLoader(cv_dataset, batch_size=cv_batch_size, shuffle=True)
 
+    # change policy dtype
+    policy.policy = policy.policy.type(train_dataset[0]['state'].dtype)
+
     # generate loss function, optimizer
     loss_fn = nn.HuberLoss(reduction='sum')
-    import pdb
-    pdb.set_trace()
     optimizer = torch.optim.Adam(policy.parameters(), lr=learning_rate, weight_decay=weight_decay)
-
-    for i in train_epochs:
+    pickle.dump(train_dataset[150:160], open(filestr+'_test_batch.pkl', 'wb'))
+    policy.save_model(filestr)
+    for i in range(train_epochs):
 
         epoch_loss = 0
         for (batch_idx, batch) in enumerate(training_loader):
+            
             # sample mini-batch and run through policy
             pred_action = policy(batch) 
             loss = loss_fn(pred_action, batch['action'])
