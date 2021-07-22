@@ -26,3 +26,5 @@ def test_deepsets_policy():
     }
     
     module(sample)
+
+    # TODO: Refine test to also test for batch data

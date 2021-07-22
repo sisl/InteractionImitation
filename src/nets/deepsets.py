@@ -63,7 +63,7 @@ class DeepSetsModule(nn.Module):
         # shape (B, max_nv)
         notnan_mask = torch.all(~torch.isnan(x), dim=-1)
         # create zero tensor of shape (B, max_nv, latent_dim) to store phi evaluations in
-        latent = torch.zeros([*x.shape[:-1], self.latent_dim])
+        latent = torch.zeros([*x.shape[:-1], self.latent_dim], dtype=x.dtype)
         # evaluate phi for all not NaN entries
         # x[batch_dynamic_mask] has shape (notnan_mask.sum(), input_dim)
         latent[notnan_mask] = self.phi(x[notnan_mask])

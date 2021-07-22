@@ -42,6 +42,6 @@ class DeepSetsPolicy(Policy, nn.Module):
         # cat path_x, path_y to tensor of dim (B, 2*P)
         path = torch.cat([sample["path_x"], sample["path_y"]], dim=-1)
         path = self.path_net(path)
-        x = torch.cat([ego, relative, path])
+        x = torch.cat([ego, relative, path], dim=-1)
         x = self.head(x)
         return x
