@@ -41,6 +41,8 @@ def test_phi():
     y = phi(torch.rand(input_dim))
     y = phi(torch.rand(7,7,7,input_dim))
 
+    assert len(phi.parameters() > 0)
+
 def test_deepsets():
     m = ds.DeepSetsModule.from_config(ds_config)
 
