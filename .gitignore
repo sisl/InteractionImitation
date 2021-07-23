@@ -119,6 +119,7 @@ venv.bak/
 
 # VS Code project settings
 .project
+.vscode
 
 # mkdocs documentation
 /site
