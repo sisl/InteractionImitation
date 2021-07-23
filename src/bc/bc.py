@@ -115,8 +115,9 @@ def generate_transforms(dataset):
 def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
     
     # hyperparams
-    train_epochs = 10000
-    cv_every = 100
+    train_epochs = 100
+    cv_every = 10
+    epoch_every = 1
     train_batch_size = 64
     cv_batch_size = 256 # doesn't matter
     learning_rate = 1e-3
@@ -138,8 +139,7 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
     # generate loss function, optimizer
     loss_fn = nn.HuberLoss(reduction='sum')
     optimizer = torch.optim.Adam(policy.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    pickle.dump(train_dataset[150:160], open(filestr+'_test_batch.pkl', 'wb'))
-    policy.save_model(filestr)
+    
     for i in range(train_epochs):
 
         epoch_loss = 0
@@ -147,6 +147,9 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
             
             # sample mini-batch and run through policy
             pred_action = policy(batch) 
+            if i == 0 and batch_idx==0:
+                pickle.dump(batch, open(filestr+'_test_batch.pkl', 'wb'))
+                policy.save_model(filestr)
             loss = loss_fn(pred_action, batch['action'])
 
             # compute loss and step optimizer
@@ -157,7 +160,7 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
             epoch_loss += loss.item() / len(train_dataset)
         
         # Write epoch loss
-        if i % 10 == 0:
+        if i % epoch_every == 0:
             print('Epoch: {}, Training Loss: {}'.format(i, epoch_loss))
 
         # measure cv loss

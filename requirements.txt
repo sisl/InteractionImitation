@@ -3,3 +3,4 @@ torch
 sklearn
 pytest
 json5
+tqdm

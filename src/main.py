@@ -5,9 +5,10 @@ import numpy as np
 import json5
 import os
 opj = os.path.join
-
+from tqdm import tqdm
 
 from src import InteractionDatasetSingleAgent, metrics
+from intersim.utils import get_map_path, get_svt
 
 def basestr(**kwargs):
     """
@@ -60,7 +61,7 @@ def main(method='bc', train=False, test=False, loc=0, config_path=None, **kwargs
 
         # make policy, train and test datasets, and send to 
         policy = policy_class(config)
-        train_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[0])#,1,2])
+        train_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[0,1,2])
         cv_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[3])
         train_fn(train_dataset, cv_dataset, policy, filestr, **kwargs)
     
@@ -72,14 +73,14 @@ def main(method='bc', train=False, test=False, loc=0, config_path=None, **kwargs
 
         # simulate policy
         track = 4
-        simulate_policy(policy, loc=loc, track=track, filestr=filestr)
+        simulate_policy(policy, loc=loc, track=track, filestr=filestr, nframes=500)
 
         # run test metrics
         test_dataset = InteractionDatasetSingleAgent(loc=loc, tracks=[track])
         metrics(filestr, test_dataset, policy)
 
 
-def simulate_policy(policy, loc=0, track=0, filestr=''):
+def simulate_policy(policy, loc=0, track=0, filestr='', nframes=float('inf')):
     """
     Simulate a trained policy
     Args:
@@ -89,20 +90,29 @@ def simulate_policy(policy, loc=0, track=0, filestr=''):
         filestr (str): path prefix to save simulation to
     """
     # animate from environment
-    env = gym.make('intersim:intersim-v0', loc=loc, track=track, 
+    svt, svt_path = get_svt(base='InteractionSimulator', loc=loc, track=track)
+    osm = get_map_path(base='InteractionSimulator', loc=loc)
+    env = gym.make('intersim:intersim-v0', svt=svt, map_path=osm, 
         min_acc=-np.inf, max_acc=np.inf)
+    # env = gym.make('intersim:intersim-v0', loc=loc, track=track, 
+    #     min_acc=-np.inf, max_acc=np.inf)
     
     ob, _ = env.reset()
     env.render()
     done = False
-    while not done: 
-        
-        # get action
-        action = policy(ob)
+    i = 0
+    with tqdm(total=min(nframes, env._svt.Tind)) as pbar:
+        while not done and i < nframes:  
+            i += 1
+            
+            # get action
+            action = policy(ob)
 
-        # propagate environment
-        ob, r, done, info = env.step(action)
-        env.render()
+            # propagate environment
+            ob, r, done, info = env.step(action)
+            env.render()
+
+            pbar.update()
 
     env.close(filestr=filestr)
 

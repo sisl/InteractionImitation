@@ -24,8 +24,22 @@ Once the repository has been set up, you can process and save expert track demon
 ```
 python src/expert_data.py --loc [LOCNUM] --track [TRACKNUM]
 ```
+You can (and should) process all tracks at once at location 0 with:
+```
+python src/expert_data.py --all-tracks
+```
 
-You can then load the experts actions and observations using
+You can then train a default behavior cloning policy with the following. Be sure to check help for main.py for running options.
+```
+python src/main.py --train
+```
+You can then test the learned policy with the following, and see the animation file in `output/`:
+```
+python src/main.py --test
+```
+
+
+You can load the experts actions manually
 ```
 from src import expert_data
 observations, actions = expert_data.load_expert_data(loc = [LOCNUM], track = [TRACKNUM])
