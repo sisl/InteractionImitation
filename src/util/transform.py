@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-
+import numpy as np
 from sklearn import preprocessing
 
 class Transform(nn.Module):
@@ -38,6 +38,55 @@ class Transform(nn.Module):
 
     def forward(self, X):
         return self.transform(X)
+
+class MinMaxScaler(Transform):
+    """
+    Scale tensor so each feature is in [0, 1]
+    """
+    def __init__(self, reduce_dim:int=None):
+        """
+        Initialize SciKitTransform
+        Args:
+            reduce_dim (int): dimension to start calculating featues from
+                e.g. with reduce_dim=2, (A, B, C, D, E) will be reshaped to (A*B, C*D*E)
+        """
+        self.reduce_dim = reduce_dim
+        super(MinMaxScaler, self).__init__()
+
+    def fit(self, X):
+        nd = X.ndim
+        if self.reduce_dim:
+            self.nfeatures = int(torch.tensor(X.shape[self.reduce_dim:]).prod())
+        else:
+            assert nd==2, 'Invalid ndim'
+            self.nfeatures = X.shape[1]
+        
+        X = X.reshape((-1,self.nfeatures))
+        nans = torch.isnan(X)
+        X[nans] = float('inf')
+        self.min = X.min(0,keepdims=True)[0]
+
+        X[nans] = -float('inf')
+        self.span = X.max(0,keepdims=True)[0] - self.min
+
+        X[nans] = np.nan
+
+    def transform(self, X):
+        
+        assert hasattr(self, 'min') and hasattr(self, 'span'), 'Model not yet fit'
+        shape = X.shape
+        X = X.reshape((-1,self.nfeatures))
+        t = (X - self.min) / self.span
+        return t.reshape(shape)
+
+    def inverse_transform(self, X):
+
+        assert hasattr(self, 'min') and hasattr(self, 'span'), 'Model not yet fit'
+        shape = X.shape
+        X = X.reshape((-1,self.nfeatures))
+        it =  X * self.span + self.min
+        return it.reshape(shape)
+
 
 class SciKitTransform(Transform):
     """
