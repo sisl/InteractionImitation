@@ -33,6 +33,10 @@ You can then train a default behavior cloning policy with the following. Be sure
 ```
 python src/main.py --train
 ```
+You can run tensorboard by running the following and opening `localhost:6006` (or alternatively port-forwarding 6006 from the remote server)
+```
+tensorboard --logdir output/
+```
 You can then test the learned policy with the following, and see the animation file in `output/`:
 ```
 python src/main.py --test

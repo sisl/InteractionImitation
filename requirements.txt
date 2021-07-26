@@ -4,3 +4,4 @@ sklearn
 pytest
 json5
 tqdm
+tensorboard

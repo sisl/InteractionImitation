@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import pickle
-#from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from src.policies import DeepSetsPolicy
 from src.util.transform import MinMaxScaler
-import json5
+from tqdm import tqdm
 
 class BehaviorCloningPolicy():
     """
@@ -115,9 +115,9 @@ def generate_transforms(dataset):
 def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
     
     # hyperparams
-    train_epochs = 100
+    train_epochs = 1000
     cv_every = 10
-    epoch_every = 1
+    epoch_every = 1000
     train_batch_size = 64
     cv_batch_size = 256 # doesn't matter
     learning_rate = 1e-3
@@ -140,7 +140,10 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
     loss_fn = nn.HuberLoss(reduction='sum')
     optimizer = torch.optim.Adam(policy.parameters(), lr=learning_rate, weight_decay=weight_decay)
     
-    for i in range(train_epochs):
+    # generate tensorboard writer
+    writer = SummaryWriter(filestr)
+    
+    for i in tqdm(range(train_epochs)):
 
         epoch_loss = 0
         for (batch_idx, batch) in enumerate(training_loader):
@@ -160,6 +163,8 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
             epoch_loss += loss.item() / len(train_dataset)
         
         # Write epoch loss
+        
+        writer.add_scalar('training loss',epoch_loss, i)
         if i % epoch_every == 0:
             print('Epoch: {}, Training Loss: {}'.format(i, epoch_loss))
 
@@ -171,6 +176,7 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
                     pred_action = policy(batch) 
                     loss = loss_fn(pred_action, batch['action'])
                     cv_loss += loss.item() / len(cv_dataset)
+            writer.add_scalar('cv loss', cv_loss, i)
             print('Epoch: {}, CV Loss: {}'.format(i, cv_loss))
 
     policy.save_model(filestr)
