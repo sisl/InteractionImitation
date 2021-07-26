@@ -7,7 +7,7 @@ with open(config_path, 'r') as cfg:
     config = json5.load(cfg)
 
 def test_deepsets_policy():
-    module = DeepSetsPolicy(config["ego_state"], config["deepsets"], config["path_encoder"], config["head"])
+    module = DeepSetsPolicy(config)
     
     ns = 5 
     nv = 7
