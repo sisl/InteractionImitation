@@ -18,9 +18,9 @@ class DeepSetsModule(nn.Module):
         super(DeepSetsModule, self).__init__()
         self.input_dim = input_dim
         self.latent_dim = latent_dim
-        self.output_dim = output_dim
         self.phi = Phi(self.input_dim, phi_hidden_n, phi_hidden_dim, self.latent_dim)
-        self.rho = Phi(self.latent_dim, rho_hidden_n, rho_hidden_dim, self.output_dim)
+        self.rho = Phi(self.latent_dim, rho_hidden_n, rho_hidden_dim, output_dim)
+        self.output_dim = self.rho.output_dim
         self.pooling = torch.sum
 
     @staticmethod

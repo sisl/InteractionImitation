@@ -8,6 +8,40 @@ from src.policies import DeepSetsPolicy
 from src.util.transform import MinMaxScaler
 from tqdm import tqdm
 
+def bc_config(ray_config):
+    config = {
+        'ego_state': {'input_dim': 5, 'hidden_n': 0, 'output_dim': 0},
+        'deepsets': {
+            'input_dim': 5,
+            'phi': {
+                'hidden_n': ray_config['deepsets_phi_hidden_n'],
+                'hidden_dim': ray_config['deepsets_phi_hidden_dim']
+                },
+            'latent_dim': ray_config['deepsets_latent_dim'],
+            'rho': {'hidden_n': 0, 'hidden_dim': 10},
+            'output_dim': 0
+        },
+        'path_encoder': {'input_dim': 40, 'hidden_n': 0, 'output_dim': 0},
+        'head': {
+            'input_dim': 0, # computed in constructor
+            'hidden_n': ray_config['head_hidden_n'],
+            'hidden_dim': ray_config['head_hidden_dim'],
+            'output_dim': 1, # number of outputs e.g. number of actions, or just one
+            'final_activation': ray_config['head_final_activation'],
+        },
+        'optim': {
+            'optimizer':'adam',
+            'lr':ray_config['lr'],
+            'weight_decay':ray_config['weight_decay']
+        },
+        'train_epochs':1000,
+        'train_batch_size': ray_config['batch_size'],
+        'loss': ray_config['loss'],
+
+    }
+    return config
+
+
 class BehaviorCloningPolicy():
     """
     Class for (continuous) behavior cloning policy

@@ -18,7 +18,7 @@ def basestr(**kwargs):
     Returns:
         basestr (str): prefix
     """
-    return 'base_'
+    return 'base'
 
 def main(method='bc', train=False, test=False, loc=0, config_path=None, **kwargs):
     """
