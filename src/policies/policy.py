@@ -8,20 +8,23 @@ class Policy:
     pass
 
 class DeepSetsPolicy(Policy, nn.Module):
-    def __init__(self, ego_config, deepsets_config, path_config, head_config):
+    def __init__(self, config):
         """
         Args:
-            ego_config (dict): dictionary for configuring the ego network
-            deepsets_config (dict): dictionary for configuring the deepsets network
-            path_config (dict): dictionary for configuring the path network
-            head_config (dict): dictionary for configuring the common head network
+            config (dict): dictionary for configuring the deep sets policy
         """
         super(DeepSetsPolicy, self).__init__()
-        self.ego_net = Phi.from_config(ego_config)
-        self.deepsets_net = DeepSetsModule.from_config(deepsets_config)
-        self.path_net = Phi.from_config(path_config)
+        ego_config = config['ego_state']
+        deepsets_config = config['deepsets']
+        pathnet_config = config['path_encoder']
+
+        self.ego_net = Phi.from_config(ego_config) if ego_config else lambda x: x
+        self.deepsets_net = DeepSetsModule.from_config(deepsets_config) if deepsets_config else lambda x: x
+        self.path_net = Phi.from_config(pathnet_config) if pathnet_config else lambda x: x
+
         cat_dim = self.ego_net.output_dim + self.deepsets_net.output_dim + self.path_net.output_dim
         # head has number of concatenated features as input
+        head_config = config['head']
         head_config["input_dim"] = cat_dim
         self.head = Phi.from_config(head_config)
 

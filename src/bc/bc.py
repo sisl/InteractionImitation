@@ -22,7 +22,7 @@ class BehaviorCloningPolicy():
         """
         self._config = config
         self._transforms = transforms
-        self._policy = DeepSetsPolicy(config["ego_state"], config["deepsets"], config["path_encoder"], config["head"])
+        self._policy = DeepSetsPolicy(config)
         
     @property
     def transforms(self):
@@ -85,13 +85,15 @@ class BehaviorCloningPolicy():
     def parameters(self):
         return self._policy.parameters()
 
-    def save_model(self, filestr):
+    def save_model(self, filestr, save_transforms=True):
         """
         Save transforms and state_dict to a location specificed by filestr
         Args:
             filestr (str): string prefix to save model to
+            save_transforms (bool): whether to save transforms
         """
-        pickle.dump(self._transforms, open(filestr+'_transforms.pkl', 'wb'))
+        if save_transforms:
+            pickle.dump(self._transforms, open(filestr+'_transforms.pkl', 'wb'))
         torch.save(self._policy.state_dict(), filestr+'_model.pt')
 
 def generate_transforms(dataset):
@@ -116,12 +118,15 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
     
     # hyperparams
     train_epochs = 1000
-    cv_every = 10
-    epoch_every = 1000
     train_batch_size = 64
-    cv_batch_size = 256 # doesn't matter
     learning_rate = 1e-3
     weight_decay = 0.1
+
+    cv_every = 10
+    print_epoch_every = 1000
+    print_cv_every = 1000
+    checkpoint_every = 100
+    cv_batch_size = 256 # doesn't matter
 
     # generate transform from train_dataset
     transforms = generate_transforms(train_dataset)
@@ -165,7 +170,7 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
         # Write epoch loss
         
         writer.add_scalar('training loss',epoch_loss, i)
-        if i % epoch_every == 0:
+        if i % print_epoch_every == 0:
             print('Epoch: {}, Training Loss: {}'.format(i, epoch_loss))
 
         # measure cv loss
@@ -177,6 +182,10 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
                     loss = loss_fn(pred_action, batch['action'])
                     cv_loss += loss.item() / len(cv_dataset)
             writer.add_scalar('cv loss', cv_loss, i)
+        if i % print_cv_every == 0:    
             print('Epoch: {}, CV Loss: {}'.format(i, cv_loss))
 
+        # save model checkpoints
+        if i % checkpoint_every == 0:
+            policy.save_model(filestr + '_epoch%04i'%(i) )
     policy.save_model(filestr)
