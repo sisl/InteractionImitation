@@ -9,14 +9,23 @@ with open(config_path, 'r') as cfg:
 def test_deepsets_policy():
     module = DeepSetsPolicy(config)
     
+    B = 25
     ns = 5 
     nv = 7
     npath = 20
 
-    ego_state = torch.rand(ns)
-    relative_state = torch.rand(nv, ns)
-    path_x = torch.rand(npath)
-    path_y = torch.rand(npath)
+    ego_state = torch.rand(B, ns)
+    relative_state = torch.rand(B, nv, ns)
+    path_x = torch.rand(B, npath)
+    path_y = torch.rand(B, npath)
+
+    sample = {
+        "state": ego_state[0],
+        "relative_state": relative_state[0],
+        "path_x": path_x[0],
+        "path_y": path_y[0],
+    }
+    module(sample)
 
     sample = {
         "state": ego_state,
@@ -24,7 +33,4 @@ def test_deepsets_policy():
         "path_x": path_x,
         "path_y": path_y,
     }
-    
     module(sample)
-
-    # TODO: Refine test to also test for batch data
