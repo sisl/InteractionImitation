@@ -14,13 +14,13 @@ class DeepSetsPolicy(Policy, nn.Module):
             config (dict): dictionary for configuring the deep sets policy
         """
         super(DeepSetsPolicy, self).__init__()
-        ego_config = config['ego_state']
+        ego_config = config['ego_encoder']
         deepsets_config = config['deepsets']
         pathnet_config = config['path_encoder']
 
-        self.ego_net = Phi.from_config(ego_config) if ego_config else lambda x: x
-        self.deepsets_net = DeepSetsModule.from_config(deepsets_config) if deepsets_config else lambda x: x
-        self.path_net = Phi.from_config(pathnet_config) if pathnet_config else lambda x: x
+        self.ego_net = Phi.from_config(ego_config)
+        self.deepsets_net = DeepSetsModule.from_config(deepsets_config)
+        self.path_net = Phi.from_config(pathnet_config)
 
         cat_dim = self.ego_net.output_dim + self.deepsets_net.output_dim + self.path_net.output_dim
         # head has number of concatenated features as input

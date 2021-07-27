@@ -7,10 +7,12 @@ from torch.utils.tensorboard import SummaryWriter
 from src.policies import DeepSetsPolicy
 from src.util.transform import MinMaxScaler
 from tqdm import tqdm
+import json5
+from ray import tune
 
 def bc_config(ray_config):
     config = {
-        'ego_state': {'input_dim': 5, 'hidden_n': 0, 'output_dim': 0},
+        'ego_encoder': {'input_dim': 5, 'hidden_n': 0, 'hidden_dim':0, 'output_dim': 0},
         'deepsets': {
             'input_dim': 5,
             'phi': {
@@ -21,7 +23,7 @@ def bc_config(ray_config):
             'rho': {'hidden_n': 0, 'hidden_dim': 10},
             'output_dim': 0
         },
-        'path_encoder': {'input_dim': 40, 'hidden_n': 0, 'output_dim': 0},
+        'path_encoder': {'input_dim': 40, 'hidden_n': 0, 'hidden_dim': 0, 'output_dim': 0},
         'head': {
             'input_dim': 0, # computed in constructor
             'hidden_n': ray_config['head_hidden_n'],
@@ -34,8 +36,8 @@ def bc_config(ray_config):
             'lr':ray_config['lr'],
             'weight_decay':ray_config['weight_decay']
         },
-        'train_epochs':1000,
-        'train_batch_size': ray_config['batch_size'],
+        'train_epochs': 100,
+        'train_batch_size': ray_config['train_batch_size'],
         'loss': ray_config['loss'],
 
     }
@@ -99,7 +101,7 @@ class BehaviorCloningPolicy():
         return action
 
     @classmethod
-    def load_model(cls, config: dict, filestr: str):
+    def load_model(cls, filestr: str, config: dict = None):
         """
         Load a model from a file prefix
         Args:
@@ -108,6 +110,9 @@ class BehaviorCloningPolicy():
         Returns
             model (BehaviorCloningPolicy): loaded model
         """
+        if not config:
+            with open(filestr+'_config.json', 'r') as cfg:
+                config = json5.load(cfg)
         transforms = pickle.load(open(filestr+'_transforms.pkl', 'rb'))
         model = cls(config, transforms=transforms)
         model._policy.load_state_dict(torch.load(filestr+'_model.pt'))
@@ -119,13 +124,17 @@ class BehaviorCloningPolicy():
     def parameters(self):
         return self._policy.parameters()
 
-    def save_model(self, filestr, save_transforms=True):
+    def save_model(self, filestr, save_config=True, save_transforms=True):
         """
         Save transforms and state_dict to a location specificed by filestr
         Args:
             filestr (str): string prefix to save model to
-            save_transforms (bool): whether to save transforms
+            save_config (bool): whether to save the config file (as a json)
+            save_transforms (bool): whether to save transforms (as a pickle)
         """
+        if save_config:
+            with open(filestr+'_config.json', 'w') as cfg:
+                json5.dump(self._config, cfg)
         if save_transforms:
             pickle.dump(self._transforms, open(filestr+'_transforms.pkl', 'wb'))
         torch.save(self._policy.state_dict(), filestr+'_model.pt')
@@ -148,15 +157,19 @@ def generate_transforms(dataset):
 
     return transforms
 
-def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
+def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     
-    # hyperparams
-    train_epochs = 1000
-    train_batch_size = 64
-    learning_rate = 1e-3
-    weight_decay = 0.1
+    using_ray = kwargs.get('ray', False)
 
-    cv_every = 10
+    # hyperparams
+    loss_type = config['loss']
+    train_epochs = config['train_epochs']
+    train_batch_size = config['train_batch_size']
+    optimizer_type = config['optim']['optimizer']
+    learning_rate = config['optim']['lr']
+    weight_decay = config['optim']['weight_decay']
+
+    cv_every = 5
     print_epoch_every = 1000
     print_cv_every = 1000
     checkpoint_every = 100
@@ -176,22 +189,30 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
     policy.policy = policy.policy.type(train_dataset[0]['state'].dtype)
 
     # generate loss function, optimizer
-    loss_fn = nn.HuberLoss(reduction='sum')
-    optimizer = torch.optim.Adam(policy.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    
+    cv_loss_fn = nn.MSELoss(reduction='sum')
+    if loss_type == 'huber':
+        loss_fn = nn.HuberLoss(reduction='sum') 
+    elif loss_type == 'mse':
+        loss_fn = nn.MSELoss(reduction='sum')
+    else:
+        raise NotImplementedError
+    if optimizer_type == 'adam':  
+        optimizer = torch.optim.Adam(policy.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    else:
+        raise NotImplementedError
+
     # generate tensorboard writer
-    writer = SummaryWriter(filestr)
+    if not using_ray:
+        writer = SummaryWriter(filestr)
     
     for i in tqdm(range(train_epochs)):
-
+        
+        # train
         epoch_loss = 0
         for (batch_idx, batch) in enumerate(training_loader):
             
             # sample mini-batch and run through policy
             pred_action = policy(batch) 
-            if i == 0 and batch_idx==0:
-                pickle.dump(batch, open(filestr+'_test_batch.pkl', 'wb'))
-                policy.save_model(filestr)
             loss = loss_fn(pred_action, batch['action'])
 
             # compute loss and step optimizer
@@ -202,24 +223,34 @@ def train(train_dataset, cv_dataset, policy, filestr, **kwargs):
             epoch_loss += loss.item() / len(train_dataset)
         
         # Write epoch loss
+        if using_ray:
+            tune.report(training_loss=epoch_loss, training_iteration=i)
+        else:
+            writer.add_scalar('training loss',epoch_loss, i)
         
-        writer.add_scalar('training loss',epoch_loss, i)
-        if i % print_epoch_every == 0:
-            print('Epoch: {}, Training Loss: {}'.format(i, epoch_loss))
+        # if i % print_epoch_every == 0:
+        #     print('Epoch: {}, Training Loss: {}'.format(i, epoch_loss))
 
-        # measure cv loss
+                # measure cv loss
+
         if i % cv_every == 0:
             with torch.no_grad():
                 cv_loss = 0.
                 for (batch_idx, batch) in enumerate(cv_loader):
                     pred_action = policy(batch) 
-                    loss = loss_fn(pred_action, batch['action'])
+                    loss = cv_loss_fn(pred_action, batch['action'])
                     cv_loss += loss.item() / len(cv_dataset)
-            writer.add_scalar('cv loss', cv_loss, i)
-        if i % print_cv_every == 0:    
-            print('Epoch: {}, CV Loss: {}'.format(i, cv_loss))
+            
+            if using_ray:
+                tune.report(cv_loss=cv_loss, cv_epoch=i)
+            else:
+                writer.add_scalar('cv loss', cv_loss, i)
+
+        # if i % print_cv_every == 0:    
+        #     print('Epoch: {}, CV Loss: {}'.format(i, cv_loss))
 
         # save model checkpoints
         if i % checkpoint_every == 0:
             policy.save_model(filestr + '_epoch%04i'%(i) )
+
     policy.save_model(filestr)

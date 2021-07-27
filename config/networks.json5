@@ -1,5 +1,5 @@
 {
-    ego_state: {
+    ego_encoder: {
         input_dim: 5, // number of state vars
         hidden_n: 0,
         hidden_dim: 5,
@@ -30,5 +30,13 @@
         hidden_dim: 50,
         output_dim: 1, // number of outputs e.g. number of actions, or just one
         final_activation: 'sigmoid',
-    }
+    },
+    optim: {
+            optimizer: 'adam',
+            lr: 1e-3,
+            weight_decay: 0.1,
+    },
+    train_epochs: 200,
+    train_batch_size: 32,
+    loss: 'huber',
 }

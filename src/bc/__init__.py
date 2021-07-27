@@ -1,1 +1,1 @@
-from src.bc.bc import BehaviorCloningPolicy, train
+from src.bc.bc import BehaviorCloningPolicy, train, bc_config
