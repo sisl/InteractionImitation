@@ -20,8 +20,11 @@ def bc_config(ray_config):
                 'hidden_dim': ray_config['deepsets_phi_hidden_dim']
                 },
             'latent_dim': ray_config['deepsets_latent_dim'],
-            'rho': {'hidden_n': 0, 'hidden_dim': 10},
-            'output_dim': 0
+            'rho': {
+                'hidden_n': ray_config['deepsets_rho_hidden_n'],
+                'hidden_dim': ray_config['deepsets_rho_hidden_dim']
+                },
+            'output_dim': ray_config['deepsets_output_dim']
         },
         'path_encoder': {'input_dim': 40, 'hidden_n': 0, 'hidden_dim': 0, 'output_dim': 0},
         'head': {
@@ -36,13 +39,12 @@ def bc_config(ray_config):
             'lr':ray_config['lr'],
             'weight_decay':ray_config['weight_decay']
         },
-        'train_epochs': 100,
+        'train_epochs': 50,
         'train_batch_size': ray_config['train_batch_size'],
         'loss': ray_config['loss'],
 
     }
     return config
-
 
 class BehaviorCloningPolicy():
     """
@@ -160,6 +162,8 @@ def generate_transforms(dataset):
 def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     
     using_ray = kwargs.get('ray', False)
+    if using_ray:
+        print('using ray')
 
     # hyperparams
     loss_type = config['loss']
@@ -169,9 +173,9 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     learning_rate = config['optim']['lr']
     weight_decay = config['optim']['weight_decay']
 
-    cv_every = 5
+    cv_every = 1
     print_epoch_every = 1000
-    print_cv_every = 1000
+    print_cv_every = 5
     checkpoint_every = 100
     cv_batch_size = 256 # doesn't matter
 
@@ -207,6 +211,10 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     
     for i in tqdm(range(train_epochs)):
         
+        # save model checkpoints
+        if i % checkpoint_every == 0:
+            policy.save_model(filestr + '_epoch%04i'%(i) )
+
         # train
         epoch_loss = 0
         for (batch_idx, batch) in enumerate(training_loader):
@@ -222,12 +230,6 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
 
             epoch_loss += loss.item() / len(train_dataset)
         
-        # Write epoch loss
-        if using_ray:
-            tune.report(training_loss=epoch_loss, training_iteration=i)
-        else:
-            writer.add_scalar('training loss',epoch_loss, i)
-        
         # if i % print_epoch_every == 0:
         #     print('Epoch: {}, Training Loss: {}'.format(i, epoch_loss))
 
@@ -241,16 +243,20 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
                     loss = cv_loss_fn(pred_action, batch['action'])
                     cv_loss += loss.item() / len(cv_dataset)
             
-            if using_ray:
-                tune.report(cv_loss=cv_loss, cv_epoch=i)
+            
+        # Write epoch loss
+        if using_ray:
+            if i % cv_every == 0:
+                tune.report(training_loss=epoch_loss, cv_loss=cv_loss, training_iteration=i+1)
             else:
+                tune.report(training_loss=epoch_loss, training_iteration=i+1)
+        else:
+            writer.add_scalar('training loss',epoch_loss, i)
+            if i % cv_every == 0:
                 writer.add_scalar('cv loss', cv_loss, i)
 
         # if i % print_cv_every == 0:    
         #     print('Epoch: {}, CV Loss: {}'.format(i, cv_loss))
 
-        # save model checkpoints
-        if i % checkpoint_every == 0:
-            policy.save_model(filestr + '_epoch%04i'%(i) )
 
     policy.save_model(filestr)

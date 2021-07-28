@@ -146,12 +146,6 @@ def parse_args():
     }
     return kwargs
 
-def main_wrapper(**kwargs):
-    if kwargs['all_runs']:
-        pass
-    else:
-        main(**kwargs)
-
 def get_full_config(ray_config:dict, method:str)->dict:
     """
     Get full model configuration from ray config and method string
@@ -186,7 +180,7 @@ def get_ray_config(method:str)->dict:
             "deepsets_rho_hidden_n": tune.choice([0,1,2]),
             "deepsets_rho_hidden_dim": tune.choice([16,32,64]),
             "deepsets_output_dim": tune.choice([8,16,32,64]),
-            "head_hidden_n": tune.choice([0,1,2]),
+            "head_hidden_n": tune.choice([1,2,3]),
             "head_hidden_dim": tune.choice([16,32,64]),
             "head_final_activation": tune.choice(['sigmoid', None]),
         }
@@ -216,8 +210,12 @@ if __name__ == '__main__':
             main(full_config, filestr='exp', datadir=datadir, ray=True, **kwargs)
         
         # set up ray tune
+        import ray
         from ray import tune
         from ray.tune.schedulers import ASHAScheduler
+        ray.shutdown() 
+        ray.init(log_to_driver=False)
+        
         datadir = os.path.abspath('./expert_data')
         ray_config = get_ray_config(kwargs['method'])
         custom_scheduler = ASHAScheduler(
@@ -230,8 +228,9 @@ if __name__ == '__main__':
             config=ray_config,
             scheduler=custom_scheduler,
             local_dir=outdir,
-            resources_per_trial={"cpu": 2},
-            num_samples=20,
+            #resources_per_trial={"cpu": 2},
+            time_budget_s=45*60,
+            num_samples=30,
         )
     else:
         raise Exception('No valid config found')
