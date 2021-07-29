@@ -103,17 +103,17 @@ if __name__ == '__main__':
         main(config, filestr=filestr, **kwargs)
 
     elif kwargs['ray'] and kwargs['train']:
-        
-        def ray_train(config, datadir=None):
-            full_config = get_full_config(config, kwargs['method'])
-            main(full_config, filestr='exp', datadir=datadir, **kwargs)
-        
         # set up ray tune
         import ray
         from ray import tune
         from ray.tune.schedulers import ASHAScheduler
+
         ray.shutdown() 
         ray.init(log_to_driver=False)
+
+        def ray_train(config, datadir=None):
+            full_config = get_full_config(config, kwargs['method'])
+            main(full_config, filestr='exp', datadir=datadir, **kwargs)
         
         datadir = os.path.abspath('./expert_data')
         ray_config = get_ray_config(kwargs['method'])
@@ -131,6 +131,14 @@ if __name__ == '__main__':
             time_budget_s=45*60,
             num_samples=2,
         )
+    elif kwargs['ray'] and kwargs['test']:
+        import ray
+        from ray.tune import Analysis, ExperimentAnalysis
+        analysis = Analysis(outdir, default_metric="cv_loss", default_mode="min")
+        config = analysis.get_best_config()
+        filepath = analysis.get_best_logdir()
+        print(filepath)
+        main(None, filestr=opj(filepath, 'exp'), **kwargs)
     else:
         raise Exception('No valid config found')
 

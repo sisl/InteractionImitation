@@ -27,7 +27,7 @@ def main(config, method='bc', train=False, test=False, loc=0, datadir='./expert_
         test (bool): whether to run test loop
         method (str): the method to try for imitation
         loc (int): the location index of the roundabout
-        config_file (str): path to config file
+        datadir (str): path to expert data
         kwargs (dict): remaining kwargs for training loop
     """
     # get/set seed
