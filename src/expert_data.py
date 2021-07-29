@@ -62,14 +62,77 @@ def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, *
     # shift actions
     actions_taken.pop(0)
     obs.pop(-1)
+    actions = torch.stack(actions_taken)
 
     # save observations and actions
-    pickle.dump(obs,open(filestr+'_observations.pkl', 'wb'))
-    torch.save(torch.stack(actions_taken), filestr+'_actions.pt')
+    pickle.dump(obs,open(filestr+'_raw_observations.pkl', 'wb'))
+    torch.save(actions, filestr+'_raw_actions.pt')
+    process_expert_observations(obs, actions, filestr)
+
+def process_expert_observations(obs, actions, filestr, dtype=torch.float32):
+    """
+    Process the expert observations and save them as torch tensors
+    Args:
+        obs (list[dict]): lost of observations
+        actions (torch.Tensor): (T, nv, a) tensor of actions
+        filestr (str): base filename with which to save out observation tensors
+    """
+    data = {'state':[], 'action':[], 'relative_state':[], 'path_x':[], 'path_y':[]}
+    assert len(obs) == len(actions), 'non-matching action and observation lengths'
+    T = len(obs)
+    max_nv = 0
+    for t in range(T):
+        nni = ~torch.isnan(obs[t]['state'][:,0])
+        max_nv = max(max_nv,nni.count_nonzero())
+        data['state'].append(obs[t]['state'][nni])
+        data['relative_state'].append(obs[t]['relative_state'].index_select(0, 
+            nni.nonzero()[:,0]).index_select(1, nni.nonzero()[:,0]))
+        data['action'].append(actions[t][nni])
+        data['path_x'].append(obs[t]['paths'][0][nni])
+        data['path_y'].append(obs[t]['paths'][1][nni])
+
+    # cat lists 
+    data['state'] = torch.cat(data['state']).type(dtype)
+    data['action'] = torch.cat(data['action']).type(dtype)
+    data['path_x'] = torch.cat(data['path_x']).type(dtype)
+    data['path_y'] = torch.cat(data['path_y']).type(dtype)
+
+    # pad second dimension of relative state
+    for i in range(len(data['relative_state'])):
+        nv1, nv2, d = data['relative_state'][i].shape
+        pad = torch.zeros(nv1, max_nv-nv2, d, dtype=dtype) * np.nan
+        data['relative_state'][i] = torch.cat((data['relative_state'][i], pad), dim=1)
+    data['relative_state'] = torch.cat(data['relative_state']).type(dtype)
+
+    # mandate equal length
+    assert len(data['state']) == len(data['relative_state']) \
+        == len(data['action']) == len(data['path_x']) \
+        == len(data['path_y']), 'dataset lengths unequal'
+
+    # save out data
+    for key in data.keys():
+        torch.save(data[key], filestr+'_'+key+'.pt')
 
 def load_expert_data(path='expert_data', loc: int = 0, track:int = 0):
     """
-    Load expert data from file.
+    Load expert data from processed files.
+    Args:
+        path (str): directory to save data
+        loc (int): location index
+        track (int): track index
+    Returns:
+        data (dict[torch.Tensor]): dict of data
+    """
+    # load observations and actions
+    filestr = opj(path, intersim.LOCATIONS[loc]+'_track%03i'%(track))
+    data = {}
+    for key in ['state','action','relative_state','path_x','path_y']:
+        data[key] = torch.load(filestr+'_'+key+'.pt')
+    return data
+
+def load_expert_data_raw(path='expert_data', loc: int = 0, track:int = 0):
+    """
+    Load expert data from raw file.
     Args:
         path (str): directory to save data
         loc (int): location index
@@ -80,8 +143,8 @@ def load_expert_data(path='expert_data', loc: int = 0, track:int = 0):
     """
     # load observations and actions
     filestr = opj(path, intersim.LOCATIONS[loc]+'_track%03i'%(track))
-    obs = pickle.load(open(filestr+'_observations.pkl', 'rb'))
-    actions = torch.load(filestr+'_actions.pt')
+    obs = pickle.load(open(filestr+'_raw_observations.pkl', 'rb'))
+    actions = torch.load(filestr+'_raw_actions.pt')
     actions = list(torch.unbind(actions))
     return obs, actions
 

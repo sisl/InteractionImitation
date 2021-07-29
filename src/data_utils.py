@@ -35,21 +35,17 @@ class InteractionDatasetSingleAgent(Dataset):
         max_nv = 0
         for track in self.tracks:
             try:
-                observations, actions = load_expert_data(path=self.output_dir, loc=self.loc, track=track)
+                data = load_expert_data(path=self.output_dir, loc=self.loc, track=track)
                 print('Loaded location {} track {}'.format(self.loc,track))
             except:
                 print('Failed to load location {} track {}'.format(self.loc,track))
                 continue
-            T = len(actions)
-            for t in range(T):
-                nni = ~torch.isnan(observations[t]['state'][:,0])
-                max_nv = max(max_nv,nni.count_nonzero())
-                self.raw_data['state'].append(observations[t]['state'][nni])
-                self.raw_data['relative_state'].append(observations[t]['relative_state'].index_select(0, 
-                    nni.nonzero()[:,0]).index_select(1, nni.nonzero()[:,0]))
-                self.raw_data['action'].append(actions[t][nni])
-                self.raw_data['path_x'].append(observations[t]['paths'][0][nni])
-                self.raw_data['path_y'].append(observations[t]['paths'][1][nni])
+            max_nv = max(max_nv, data['relative_state'].shape[1])
+            self.raw_data['state'].append(data['state'])
+            self.raw_data['relative_state'].append(data['relative_state'])
+            self.raw_data['action'].append(data['action'])
+            self.raw_data['path_x'].append(data['path_x'])
+            self.raw_data['path_y'].append(data['path_y'])
 
         # cat lists
         self.raw_data['state'] = torch.cat(self.raw_data['state']).type(self.dtype)
