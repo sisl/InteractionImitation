@@ -14,7 +14,7 @@ def bc_config(ray_config):
     config = {
         'ego_encoder': {'input_dim': 5, 'hidden_n': 0, 'hidden_dim':0, 'output_dim': 0},
         'deepsets': {
-            'input_dim': 5,
+            'input_dim': 6,
             'phi': {
                 'hidden_n': ray_config['deepsets_phi_hidden_n'],
                 'hidden_dim': ray_config['deepsets_phi_hidden_dim']
@@ -39,7 +39,7 @@ def bc_config(ray_config):
             'lr':ray_config['lr'],
             'weight_decay':ray_config['weight_decay']
         },
-        'train_epochs': 50,
+        'train_epochs': 20,
         'train_batch_size': ray_config['train_batch_size'],
         'loss': ray_config['loss'],
 

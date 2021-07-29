@@ -6,7 +6,7 @@
         output_dim: 5
     },
     deepsets: {
-        input_dim: 5, // number of relative state vars for others
+        input_dim: 6, // number of relative state vars for others
         phi: {
             hidden_n: 2,
             hidden_dim: 20,
