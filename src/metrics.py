@@ -51,8 +51,6 @@ def visualize_distribution(true, pred, filestr):
     """
     nni1 = ~torch.isnan(true)
     nni2 = ~torch.isnan(pred)
-    import pdb
-    pdb.set_trace()
     plt.figure()
     plt.hist(true[nni1].numpy(), density=True, bins=20)
     plt.hist(pred[nni2].numpy(), density=True, bins=20)
