@@ -33,6 +33,8 @@ def parse_args():
         default=None, type=str)
     parser.add_argument('--seed', default=0, type=int,
         help='seed')    
+    parser.add_argument('--nframes', default=500, type=int,
+        help='frames for test animation') 
     args = parser.parse_args()
     kwargs = {
         'train':args.train, 
@@ -41,7 +43,8 @@ def parse_args():
         'loc':args.loc,
         'config_path':args.config,
         'seed':args.seed,
-        'ray':args.ray
+        'ray':args.ray,
+        'nframes':args.nframes,
     }
     return kwargs
 
@@ -100,6 +103,8 @@ if __name__ == '__main__':
         if not os.path.isdir(outdir):
             os.makedirs(outdir)   
         filestr = opj(outdir, basestr(**kwargs)) 
+        if kwargs['ray']:
+            filestr = kwargs['config_path'].replace('_config.json','')
         main(config, filestr=filestr, **kwargs)
 
     elif kwargs['ray'] and kwargs['train']:

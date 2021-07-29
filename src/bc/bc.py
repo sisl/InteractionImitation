@@ -39,7 +39,7 @@ def bc_config(ray_config):
             'lr':ray_config['lr'],
             'weight_decay':ray_config['weight_decay']
         },
-        'train_epochs': 20,
+        'train_epochs': 40,
         'train_batch_size': ray_config['train_batch_size'],
         'loss': ray_config['loss'],
 

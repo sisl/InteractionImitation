@@ -47,7 +47,7 @@ def main(config, method='bc', train=False, test=False, loc=0, datadir='./expert_
 
         # make policy, train and test datasets, and send to 
         policy = policy_class(config)
-        train_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=[0])#,1,2])
+        train_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=[0,1,2])
         cv_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=[3])
         train_fn(config, policy, train_dataset, cv_dataset, filestr, **kwargs)
     
@@ -59,7 +59,7 @@ def main(config, method='bc', train=False, test=False, loc=0, datadir='./expert_
 
         # simulate policy
         track = 4
-        simulate_policy(policy, loc=loc, track=track, filestr=filestr, nframes=500)
+        simulate_policy(policy, loc=loc, track=track, filestr=filestr, nframes=kwargs['nframes'])
 
         # run test metrics
         test_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=[track])
@@ -101,4 +101,4 @@ def simulate_policy(policy, loc=0, track=0, filestr='', nframes=float('inf')):
 
             pbar.update()
 
-    env.close(filestr=filestr)
+    env.close(filestr=filestr+'_sim')
