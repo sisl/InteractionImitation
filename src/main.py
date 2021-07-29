@@ -54,7 +54,7 @@ def main(config, method='bc', train=False, test=False, loc=0, datadir='./expert_
     if test:
 
         # load policy 
-        policy = policy_class.load_model(config, filestr)
+        policy = policy_class.load_model(filestr, config)
         policy.eval()
 
         # simulate policy
