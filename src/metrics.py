@@ -18,7 +18,7 @@ def metrics(filestr: str, test_dataset, policy):
     # a) simulation files that were saved under the trained policy with prefix 'policy'
     # b) applying the policy to observations in the test dataset
 
-    # load trajectory
+    # load simulated trajectory
     states = torch.load(filestr + '_sim_states.pt').detach()
     lengths = torch.load(filestr + '_sim_lengths.pt').detach()
     widths = torch.load(filestr + '_sim_widths.pt').detach()
