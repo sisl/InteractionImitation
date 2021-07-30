@@ -142,7 +142,7 @@ if __name__ == '__main__':
         analysis = Analysis(outdir, default_metric="cv_loss", default_mode="min")
         config = analysis.get_best_config()
         filepath = analysis.get_best_logdir()
-        print(filepath)
+        print("Best ray experiment:", filepath)
         main(None, filestr=opj(filepath, 'exp'), **kwargs)
     else:
         raise Exception('No valid config found')
