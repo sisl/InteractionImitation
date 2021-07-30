@@ -3,6 +3,16 @@ from functools import partial
 import os
 opj = os.path.join
 
+# set up ray tune
+import ray
+from ray import tune
+from ray.tune import Analysis, ExperimentAnalysis
+from ray.tune.schedulers import ASHAScheduler
+from hyperopt import hp
+from ray.tune.suggest.hyperopt import HyperOptSearch
+
+
+
 from src.main import basestr, main
 
 def parse_args():
@@ -72,18 +82,18 @@ def get_ray_config(method:str)->dict:
     """
     if method == 'bc':
         ray_config = {
-            "lr": tune.choice([1e-4, 1e-3, 1e-2, 1e-1]),
-            "weight_decay": tune.choice([0.001, 0.01, 0.1, 0.5, 0.9]),
+            "lr": tune.loguniform(1e-5, 1e-3),
+            "weight_decay": tune.choice([0, 0.1]),
             "loss": tune.choice(['huber', 'mse']),
             "train_batch_size": tune.choice([16,32,64]),
-            "deepsets_phi_hidden_n": tune.choice([1,2,3]),
-            "deepsets_phi_hidden_dim": tune.choice([16,32,64]),
-            "deepsets_latent_dim": tune.choice([16,32,64]),
-            "deepsets_rho_hidden_n": tune.choice([0,1,2]),
-            "deepsets_rho_hidden_dim": tune.choice([16,32,64]),
-            "deepsets_output_dim": tune.choice([8,16,32,64]),
-            "head_hidden_n": tune.choice([1,2,3]),
-            "head_hidden_dim": tune.choice([16,32,64]),
+            "deepsets_phi_hidden_n": tune.randint(1,5),
+            "deepsets_phi_hidden_dim": tune.lograndint(8,65),
+            "deepsets_latent_dim": tune.lograndint(8,129),
+            "deepsets_rho_hidden_n": tune.randint(0,3),
+            "deepsets_rho_hidden_dim": tune.lograndint(8,129),
+            "deepsets_output_dim": tune.lograndint(4,129),
+            "head_hidden_n": tune.randint(1,6),
+            "head_hidden_dim": tune.lograndint(16,257),
             "head_final_activation": tune.choice(['sigmoid', None]),
         }
     else:
@@ -108,10 +118,6 @@ if __name__ == '__main__':
         main(config, filestr=filestr, **kwargs)
 
     elif kwargs['ray'] and kwargs['train']:
-        # set up ray tune
-        import ray
-        from ray import tune
-        from ray.tune.schedulers import ASHAScheduler
 
         ray.shutdown() 
         ray.init(log_to_driver=False)
@@ -121,29 +127,31 @@ if __name__ == '__main__':
             main(full_config, filestr='exp', datadir=datadir, **kwargs)
         
         datadir = os.path.abspath('./expert_data')
+        
         ray_config = get_ray_config(kwargs['method'])
-        custom_scheduler = ASHAScheduler(
-            metric='cv_loss',
-            mode="min",
-            grace_period=25,
-        )
+        search = HyperOptSearch(ray_config, max_concurrent=8, metric='cv_loss',mode="min",)
+        custom_scheduler = ASHAScheduler(metric='cv_loss', mode="min", grace_period=15)
+
         analysis = tune.run(
             partial(ray_train, datadir=datadir),
-            config=ray_config,
+            #config=ray_config,
+            search_alg=search,
             scheduler=custom_scheduler,
             local_dir=outdir,
             #resources_per_trial={"cpu": 2},
-            time_budget_s=45*60,
-            num_samples=2,
+            time_budget_s=120*60,
+            num_samples=100,
         )
     elif kwargs['ray'] and kwargs['test']:
-        import ray
-        from ray.tune import Analysis, ExperimentAnalysis
         analysis = Analysis(outdir, default_metric="cv_loss", default_mode="min")
         config = analysis.get_best_config()
         filepath = analysis.get_best_logdir()
+        filestr = opj(filepath, 'exp')
+        config_path = filestr+'_config.json'
+        with open(config_path, 'r') as cfg:
+            config = json5.load(cfg)
         print(filepath)
-        main(None, filestr=opj(filepath, 'exp'), **kwargs)
+        main(config, filestr=filestr, **kwargs)
     else:
         raise Exception('No valid config found')
 
