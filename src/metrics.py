@@ -83,6 +83,11 @@ def divergence(p, q, type='kl', n_components=0):
     Args:
         p (torch.tensor): (n) samples from p
         q (torch.tensor): (m) samples from q
+        type (str): divergence to use
+        n_components (int): method to use to compute kl divergence
+            n_components < 0: approximate samples with histogram density
+            n_components == 0: approximate samples by Gaussian distributions and compute analytically
+            n_components > 0: approximate samples as Gaussian mixture models with n_components components
     Returns:
         d (float): approximate divergence
     """
