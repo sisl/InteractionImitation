@@ -87,7 +87,24 @@ def divergence(p, q, type='kl', n_components=0):
         d (float): approximate divergence
     """
     if type == 'kl':
-        if n_components == 0:
+        if n_components < 0:
+            # Use histogram binning to discretize sampled distributions
+            p_hist, p_edges = np.histogram(p.unsqueeze(-1), bins='auto', density=True)
+            q_hist, q_edges = np.histogram(q.unsqueeze(-1), bins='auto', density=True)
+            px = evaluate_histogram(p, p_hist, p_edges)
+            qx = evaluate_histogram(p, q_hist, q_edges)
+            p_supp = ~np.isclose(px, 0.0)
+            q_supp = ~np.isclose(qx, 0.0)
+            if np.any(np.logical_and(p_supp, ~q_supp)):
+                # if not support(p) subset support(q)
+                return np.nan
+            elif ~np.any(p_supp):
+                # if p is zero everywhere
+                return 0.
+            d = np.mean(np.log(px[p_supp] / qx[p_supp]))
+            return d
+        elif n_components == 0:
+            # Assume p and q to be Gaussian
             pm = torch.mean(p)
             qm = torch.mean(q)
             pv = torch.var(p)
@@ -162,3 +179,22 @@ def nanmean(v, *args, inplace=False, **kwargs):
     v[is_nan] = 0
     result = v.sum(*args, **kwargs) / (~is_nan).float().sum(*args, **kwargs)
     return result
+
+
+def evaluate_histogram(x, hist, bin_edges):
+    """
+    Evaluate a histogram 
+    Args:
+        x (array) : points at which to evaluate the histogram
+        hist (array): histogram values in terms of number of occurrences or probability
+        bin_edges (array): edges of histogram bins
+            e.g. from hist, bin_edges = np.histogram(p, bins='auto', density=True)
+    Return:
+        r: tensor: (batch,) kl between each sample
+    """
+    idx = np.digitize(x, bin_edges)
+    mask = np.logical_and(np.less(0, idx), np.less(idx, len(bin_edges)))
+    r = np.zeros_like(x)
+    r[mask] = hist[idx[mask] - 1]
+    return r
+
