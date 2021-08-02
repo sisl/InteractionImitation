@@ -69,15 +69,18 @@ def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, *
     torch.save(actions, filestr+'_raw_actions.pt')
     process_expert_observations(obs, actions, filestr)
 
-def process_expert_observations(obs, actions, filestr, dtype=torch.float32):
+def process_expert_observations(obs, actions, filestr, remove_outliers=True, dtype=torch.float32):
     """
     Process the expert observations and save them as torch tensors
     Args:
         obs (list[dict]): lost of observations
         actions (torch.Tensor): (T, nv, a) tensor of actions
         filestr (str): base filename with which to save out observation tensors
+        remove_outliers (bool): whether to remove datapoints with acceleration above or below 5 m/s/s
+        dtype (torch.Type): type to convert data to
     """
-    data = {'state':[], 'action':[], 'relative_state':[], 'path_x':[], 'path_y':[]}
+    keys = ['state', 'action', 'relative_state', 'path_x', 'path_y']
+    data = {key:[] for key in keys}
     assert len(obs) == len(actions), 'non-matching action and observation lengths'
     T = len(obs)
     max_nv = 0
@@ -103,6 +106,11 @@ def process_expert_observations(obs, actions, filestr, dtype=torch.float32):
         pad = torch.zeros(nv1, max_nv-nv2, d, dtype=dtype) * np.nan
         data['relative_state'][i] = torch.cat((data['relative_state'][i], pad), dim=1)
     data['relative_state'] = torch.cat(data['relative_state']).type(dtype)
+
+    if remove_outliers:
+        non_outlier_indices = torch.nonzero(torch.abs(data['action'][:,0]) < 5)
+        for key in keys:
+            data[key] = data[key][non_outlier_indices[:,0]]    
 
     # mandate equal length
     assert len(data['state']) == len(data['relative_state']) \
