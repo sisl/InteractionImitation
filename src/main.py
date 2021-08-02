@@ -59,14 +59,14 @@ def main(config, method='bc', train=False, test=False, loc=0, datadir='./expert_
 
         # simulate policy
         track = 4
-        simulate_policy(policy, loc=loc, track=track, filestr=filestr, nframes=kwargs['nframes'])
+        simulate_policy(policy, loc=loc, track=track, filestr=filestr, nframes=kwargs['nframes'], graph=kwargs['graph'])
 
         # run test metrics
         test_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=[track])
         metrics(filestr, test_dataset, policy)
 
 
-def simulate_policy(policy, loc=0, track=0, filestr='', nframes=float('inf')):
+def simulate_policy(policy, loc=0, track=0, filestr='', nframes=float('inf'), graph=None):
     """
     Simulate a trained policy
     Args:
@@ -79,8 +79,12 @@ def simulate_policy(policy, loc=0, track=0, filestr='', nframes=float('inf')):
     basepath = os.path.abspath('./InteractionSimulator')
     svt, svt_path = get_svt(base=basepath, loc=loc, track=track)
     osm = get_map_path(base=basepath, loc=loc)
-    env = gym.make('intersim:intersim-v0', svt=svt, map_path=osm, 
-        min_acc=-np.inf, max_acc=np.inf)
+    if graph:
+        env = gym.make('intersim:intersim-v0', svt=svt, map_path=osm, 
+            min_acc=-np.inf, max_acc=np.inf, graph=graph, mask_relstate=True)
+    else:
+        env = gym.make('intersim:intersim-v0', svt=svt, map_path=osm, 
+            min_acc=-np.inf, max_acc=np.inf)
     # env = gym.make('intersim:intersim-v0', loc=loc, track=track, 
     #     min_acc=-np.inf, max_acc=np.inf)
     

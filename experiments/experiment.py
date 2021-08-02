@@ -11,6 +11,9 @@ from ray.tune.schedulers import ASHAScheduler
 from hyperopt import hp
 from ray.tune.suggest.hyperopt import HyperOptSearch
 
+# get graphs
+import intersim
+from intersim.graphs import ConeVisibilityGraph
 
 
 from src.main import basestr, main
@@ -45,6 +48,10 @@ def parse_args():
         help='seed')    
     parser.add_argument('--nframes', default=500, type=int,
         help='frames for test animation') 
+    parser.add_argument('--graph', action='store_true',
+        help='whether to mask the relative states based on a ConeVisibilityGraph')
+    parser.add_argument('-d', default='./expert_data', type=str,
+                       help='data directory')
     args = parser.parse_args()
     kwargs = {
         'train':args.train, 
@@ -55,7 +62,11 @@ def parse_args():
         'seed':args.seed,
         'ray':args.ray,
         'nframes':args.nframes,
+        'datadir':os.path.abspath(args.d),
+        'graph':None
     }
+    if args.graph:
+        kwargs['graph'] = ConeVisibilityGraph(r=20, half_angle=120)
     return kwargs
 
 def get_full_config(ray_config:dict, method:str)->dict:
@@ -124,23 +135,21 @@ if __name__ == '__main__':
 
         def ray_train(config, datadir=None):
             full_config = get_full_config(config, kwargs['method'])
-            main(full_config, filestr='exp', datadir=datadir, **kwargs)
-        
-        datadir = os.path.abspath('./expert_data')
+            main(full_config, filestr='exp', **kwargs)
         
         ray_config = get_ray_config(kwargs['method'])
         search = HyperOptSearch(ray_config, max_concurrent=8, metric='cv_loss',mode="min",)
         custom_scheduler = ASHAScheduler(metric='cv_loss', mode="min", grace_period=15)
 
         analysis = tune.run(
-            partial(ray_train, datadir=datadir),
+            ray_train, 
             #config=ray_config,
             search_alg=search,
             scheduler=custom_scheduler,
             local_dir=outdir,
             #resources_per_trial={"cpu": 2},
             time_budget_s=120*60,
-            num_samples=100,
+            num_samples=200,
         )
     elif kwargs['ray'] and kwargs['test']:
         analysis = Analysis(outdir, default_metric="cv_loss", default_mode="min")

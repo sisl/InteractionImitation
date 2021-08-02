@@ -7,21 +7,28 @@ import numpy as np
 import intersim
 from intersim.utils import get_map_path, get_svt, SVT_to_stateactions
 from intersim import collisions
+from intersim.graphs import ConeVisibilityGraph
 import os
 opj = os.path.join
 
-def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, **kwargs):
+def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, 
+                            mask_relstate: bool = False, regularize_actions: bool = False, 
+                            **kwargs):
     """
     Function to save (joint) states and observations from simulated frame
     Args:
         path (str): directory to save data
         loc (int): location index
         track (int): track index
+        mask_relstate (bool): whether to mask the relative states from the cone visibility graph
+        regularize_actions (bool): whether to regularize the action selection
         kwargs: arguments for environment instantiation
     """
     
+    action_reg = 0.002 if regularize_actions else 0
+    
     if not os.path.isdir(path):
-        os.mkdir(path)
+        os.makedirs(path)
     filestr = opj(path,intersim.LOCATIONS[loc]+'_track%03i'%(track))
     
     svt, svt_path = get_svt(base='InteractionSimulator', loc=loc, track=track)
@@ -31,8 +38,13 @@ def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, *
     states, actions = SVT_to_stateactions(svt)
 
     # animate from environment
-    env = gym.make('intersim:intersim-v0', svt=svt, map_path=osm, **kwargs, 
-        min_acc=-np.inf, max_acc=np.inf)
+    if mask_relstate:
+        cvg = ConeVisibilityGraph(r=20, half_angle=120)
+        env = gym.make('intersim:intersim-v0', svt=svt, map_path=osm, 
+            min_acc=-np.inf, max_acc=np.inf, graph=cvg, mask_relstate=True, **kwargs)
+    else:
+        env = gym.make('intersim:intersim-v0', svt=svt, map_path=osm, **kwargs, 
+            min_acc=-np.inf, max_acc=np.inf)
     
     env.reset()
     done = False
@@ -47,7 +59,7 @@ def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0, *
             max_devs.append(norms.max())
 
         # propagate environment
-        ob, r, done, info = env.step(env.target_state(svt.simstate[i+1]))
+        ob, r, done, info = env.step(env.target_state(svt.simstate[i+1], mu=action_reg))
         obs.append(ob)
         actions_taken.append(info['action_taken'])
         i += 1
@@ -165,9 +177,25 @@ if __name__ == '__main__':
                        help='track number (default 0)')
     parser.add_argument('--all-tracks', action='store_true',
                        help='whether to process all tracks at location')
+    parser.add_argument('--graph', action='store_true',
+                       help='whether to mask the relative states based on a ConeVisibilityGraph')
+    parser.add_argument('--reg', action='store_true',
+                       help='whether to regularize actions in the action targeter')
+    parser.add_argument('-o', default='./expert_data', type=str,
+                       help='output folder')
     args = parser.parse_args()
+
+    kwargs = {
+        'loc':args.loc, 
+        'track': args.track,
+        'path':args.o, 
+        'mask_relstate':args.graph, 
+        'regularize_actions': args.reg
+    }
+
     if args.all_tracks:
         for i in range(intersim.MAX_TRACKS):
-            generate_expert_data(loc=args.loc, track=i)
+            kwargs['track'] = i
+            generate_expert_data(**kwargs)
     else:
-        generate_expert_data(loc=args.loc,track=args.track)
+        generate_expert_data(**kwargs)
