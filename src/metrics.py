@@ -79,7 +79,7 @@ def average_velocity(states):
     arg_v = nanmean(vehicle_avg_v)
     return arg_v
 
-def divergence(p, q, type='kl'):
+def divergence(p, q, type='kl', n_components=0):
     """
     Calculate a divergence between p and q
     Args:
@@ -88,7 +88,46 @@ def divergence(p, q, type='kl'):
     Returns:
         d (float): approximate divergence
     """
-    pass
+    if type == 'kl':
+        if n_components == 0:
+            pm = torch.mean(p)
+            qm = torch.mean(q)
+            pv = torch.var(p)
+            qv = torch.var(q)
+            d = kl_normal(pm, pv, qm, qv).item()
+            return d
+        else:
+            from sklearn.mixture import GaussianMixture
+            p = p.unsqueeze(-1)
+            q = q.unsqueeze(-1)
+            p_gmm = GaussianMixture(n_components=n_components).fit(p)
+            q_gmm = GaussianMixture(n_components=n_components).fit(q)
+            px = p_gmm.score_samples(p)
+            qx = q_gmm.score_samples(p)
+            d = np.mean(px - qx).item()
+            return d
+    else:
+        raise NotImplementedError("Please implement divergence for type '{}'".format(type))
+
+
+def kl_normal(pm, pv, qm, qv):
+    """
+    Computes the elem-wise KL divergence between two normal distributions KL(p || q) and
+    sum over the last dimension
+
+    Args:
+        pm: tensor: (batch, dim): p mean
+        pv: tensor: (batch, dim): p variance
+        qm: tensor: (batch, dim): q mean
+        qv: tensor: (batch, dim): q variance
+
+    Return:
+        kl: tensor: (batch,): kl between each sample
+    """
+    element_wise = 0.5 * (torch.log(qv) - torch.log(pv) + pv / qv + (pm - qm).pow(2) / qv - 1)
+    kl = element_wise.sum(-1)
+    return kl
+
 
 def nanmean(v, *args, inplace=False, **kwargs):
     """
