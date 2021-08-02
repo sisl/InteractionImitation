@@ -127,6 +127,23 @@ def kl_normal(pm, pv, qm, qv):
     return kl
 
 
+def kl_cat(q, log_q, log_p):
+    """
+    Computes the KL divergence between two categorical distributions
+
+    Args:
+        q: tensor: (batch, dim): Categorical distribution parameters
+        log_q: tensor: (batch, dim): Log of q
+        log_p: tensor: (batch, dim): Log of p
+
+    Return:
+        kl: tensor: (batch,) kl between each sample
+    """
+    element_wise = (q * (log_q - log_p))
+    kl = element_wise.sum(-1)
+    return kl
+
+
 def nanmean(v, *args, inplace=False, **kwargs):
     """
     Calculate mean over not nan entries
