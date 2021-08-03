@@ -53,15 +53,15 @@ def metrics(filestr: str, test_dataset, policy):
     visualize_distribution(true_actions[:,0], pred_actions[:,0], filestr+'_action_viz') 
 
     # calculate divergence between acceleration distributions
-    acceleration_kl = divergence(pred_actions, true_actions, type='kl', n_components=-1)
-    info['acceleration_kl'] = acceleration_kl
+    acceleration_divergence = divergence(pred_actions, true_actions, type='js', n_components=-1)
+    info['acceleration_divergence'] = acceleration_divergence
 
     # calculate divergence between velocity distributions
     sim_velocities = states[:,:,2]
     sim_velocities = sim_velocities[~torch.isnan(sim_velocities)].flatten()
     true_velocities = torch.cat(true_velocities, dim=0)
-    velocity_kl = divergence(sim_velocities, true_velocities, type='kl', n_components=-1)
-    info['velocity_kl'] = velocity_kl
+    velocity_divergence = divergence(sim_velocities, true_velocities, type='js', n_components=-1)
+    info['velocity_divergence'] = velocity_divergence
 
     return info
 
