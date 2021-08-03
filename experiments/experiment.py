@@ -52,6 +52,8 @@ def parse_args():
         help='whether to mask the relative states based on a ConeVisibilityGraph')
     parser.add_argument('-d', default='./expert_data', type=str,
                        help='data directory')
+    parser.add_argument('-o', default=None, type=str,
+                       help='output directory')                   
     args = parser.parse_args()
     kwargs = {
         'train':args.train, 
@@ -63,8 +65,14 @@ def parse_args():
         'ray':args.ray,
         'nframes':args.nframes,
         'datadir':os.path.abspath(args.d),
-        'graph':None
+        'graph':None,
+        'outdir': opj('output',args.method,'loc%02i'%(args.loc)),
+        'train_tracks':[0,1,2],
+        'cv_tracks':[3],
+        'test_tracks':[4],
     }
+    if args.o:
+        kwargs['outdir'] = args.o
     if args.graph:
         kwargs['graph'] = ConeVisibilityGraph(r=20, half_angle=120)
     return kwargs
@@ -115,15 +123,14 @@ if __name__ == '__main__':
     kwargs = parse_args()
     
     # make prefix of output files
-    outdir = opj('output',kwargs['method'],'loc%02i'%(kwargs['loc']))
 
     if kwargs['config_path']:
         # load config
         with open(kwargs['config_path'], 'r') as cfg:
             config = json5.load(cfg)
-        if not os.path.isdir(outdir):
-            os.makedirs(outdir)   
-        filestr = opj(outdir, basestr(**kwargs)) 
+        if not os.path.isdir(kwargs['outdir']):
+            os.makedirs(kwargs['outdir'])   
+        filestr = opj(kwargs['outdir'], basestr(**kwargs)) 
         if kwargs['ray']:
             filestr = kwargs['config_path'].replace('_config.json','')
         main(config, filestr=filestr, **kwargs)
@@ -146,13 +153,13 @@ if __name__ == '__main__':
             #config=ray_config,
             search_alg=search,
             scheduler=custom_scheduler,
-            local_dir=outdir,
+            local_dir=kwargs['outdir'],
             #resources_per_trial={"cpu": 2},
             time_budget_s=120*60,
             num_samples=200,
         )
     elif kwargs['ray'] and kwargs['test']:
-        analysis = Analysis(outdir, default_metric="cv_loss", default_mode="min")
+        analysis = Analysis(kwargs['outdir'], default_metric="cv_loss", default_mode="min")
         config = analysis.get_best_config()
         filepath = analysis.get_best_logdir()
         filestr = opj(filepath, 'exp')
