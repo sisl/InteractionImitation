@@ -25,10 +25,10 @@ def test_kl_divergence():
     d5 = divergence(q, p, type='kl', n_components=-1)
     assert isinstance(d5, float)
 
-    p = 1000000 * torch.randn(1000)
+    p = 1000 * torch.randn(1000)
     q = torch.randn(1000)
     d6 = divergence(p, q, type='kl', n_components=-1)
-    assert np.isnan(d6)
+    assert ~np.isfinite(d6)
 
 def test_evaluate_histogram():
     N = 10000
@@ -45,6 +45,23 @@ def test_evaluate_histogram():
     assert px.shape == p.shape
     qx = evaluate_histogram(q, q_hist, q_edges)
     assert qx.shape == q.shape
+
+
+def test_js_divergence():
+    N = 1000
+    p = torch.randn(N)
+    q = 1.0 + 2.0 * torch.randn(2*N)
+
+    d1 = divergence(p, q, type='js')
+    d2 = divergence(q, p, type='js')
+    assert d1 == d2
+
+    p = 1000 * torch.randn(1000)
+    q = torch.randn(1000)
+    d1 = divergence(p, q, type='js')
+    d2 = divergence(q, p, type='js')
+    assert d1 == d2
+    assert np.isfinite(d1)
 
 
 if __name__ == '__main__':

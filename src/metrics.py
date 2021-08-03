@@ -96,13 +96,15 @@ def average_velocity(states):
     arg_v = nanmean(vehicle_avg_v)
     return arg_v
 
-def divergence(p, q, type='kl', n_components=0):
+def divergence(p, q, type='js', n_components=0):
     """
     Calculate a divergence between p and q
     Args:
         p (torch.tensor): (n) samples from p
         q (torch.tensor): (m) samples from q
         type (str): divergence to use
+            'kl': Kullback-Leibler divergence KL(p||q)
+            'js': Jensen-Shannon divergence (symmetric KLD)
         n_components (int): method to use to compute kl divergence
             n_components < 0: approximate samples with histogram density
             n_components == 0: approximate samples by Gaussian distributions and compute analytically
@@ -110,22 +112,23 @@ def divergence(p, q, type='kl', n_components=0):
     Returns:
         d (float): approximate divergence
     """
-    if type == 'kl':
+    if type == 'js':
+        # Use histogram binning to discretize sampled distributions
+        p_hist = np.histogram(p, bins='auto', density=True)
+        q_hist = np.histogram(q, bins='auto', density=True)
+        m = torch.cat([p, q], dim=0)
+        m_weights = torch.cat([torch.full_like(p, 1./len(p)), torch.full_like(q, 1./len(q))], dim=0)
+        m_bins = np.sort(np.concatenate([p_hist[1], q_hist[1]]))
+        m_hist = np.histogram(m, bins=m_bins, density=True, weights=m_weights)
+        d = .5 * kl_histogram(p, p_hist, m_hist) + .5 * kl_histogram(q, q_hist, m_hist)
+        return d
+
+    elif type == 'kl':
         if n_components < 0:
             # Use histogram binning to discretize sampled distributions
-            p_hist, p_edges = np.histogram(p.unsqueeze(-1), bins='auto', density=True)
-            q_hist, q_edges = np.histogram(q.unsqueeze(-1), bins='auto', density=True)
-            px = evaluate_histogram(p, p_hist, p_edges)
-            qx = evaluate_histogram(p, q_hist, q_edges)
-            p_supp = ~np.isclose(px, 0.0)
-            q_supp = ~np.isclose(qx, 0.0)
-            if np.any(np.logical_and(p_supp, ~q_supp)):
-                # if not support(p) subset support(q)
-                return np.nan
-            elif ~np.any(p_supp):
-                # if p is zero everywhere
-                return 0.
-            d = np.mean(np.log(px[p_supp] / qx[p_supp]))
+            p_hist = np.histogram(p, bins='auto', density=True)
+            q_hist = np.histogram(q, bins='auto', density=True)
+            d = kl_histogram(p, p_hist, q_hist)
             return d
         elif n_components == 0:
             # Assume p and q to be Gaussian
@@ -147,6 +150,31 @@ def divergence(p, q, type='kl', n_components=0):
             return d
     else:
         raise NotImplementedError("Please implement divergence for type '{}'".format(type))
+
+def kl_histogram(p_sample, p_hist, q_hist):
+    """
+    Calculate the kl divergence between p and q based on a histogram representation
+    Args:
+        p_sample (torch.tensor): (n) samples from p
+        p_hist (tuple): result of np.histogram(density=True) for samples from p
+        q_hist (tuple): result of np.histogram(density=True) for samples from q
+    Returns:
+        d (float): approximate KL divergence
+    """
+    p_density, p_edges = p_hist
+    q_density, q_edges = q_hist
+    px = evaluate_histogram(p_sample, p_density, p_edges)
+    qx = evaluate_histogram(p_sample, q_density, q_edges)
+    p_supp = ~np.isclose(px, 0.0)
+    q_supp = ~np.isclose(qx, 0.0)
+    if np.any(np.logical_and(p_supp, ~q_supp)):
+        # if not support(p) subset support(q)
+        return np.inf
+    elif ~np.any(p_supp):
+        # if p is zero everywhere
+        return 0.
+    d = np.mean(np.log(px[p_supp] / qx[p_supp]))
+    return d
 
 
 def kl_normal(pm, pv, qm, qv):
