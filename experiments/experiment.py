@@ -166,7 +166,7 @@ if __name__ == '__main__':
         config_path = filestr+'_config.json'
         with open(config_path, 'r') as cfg:
             config = json5.load(cfg)
-        print(filepath)
+        print("Best ray experiment:", filepath)
         main(config, filestr=filestr, **kwargs)
     else:
         raise Exception('No valid config found')
