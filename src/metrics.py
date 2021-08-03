@@ -53,14 +53,14 @@ def metrics(filestr: str, test_dataset, policy):
     visualize_distribution(true_actions[:,0], pred_actions[:,0], filestr+'_action_viz') 
 
     # calculate divergence between acceleration distributions
-    acceleration_divergence = divergence(pred_actions, true_actions, type='js', n_components=-1)
+    acceleration_divergence = divergence(pred_actions, true_actions, type='js')
     info['acceleration_divergence'] = acceleration_divergence
 
     # calculate divergence between velocity distributions
     sim_velocities = states[:,:,2]
     sim_velocities = sim_velocities[~torch.isnan(sim_velocities)].flatten()
     true_velocities = torch.cat(true_velocities, dim=0)
-    velocity_divergence = divergence(sim_velocities, true_velocities, type='js', n_components=-1)
+    velocity_divergence = divergence(sim_velocities, true_velocities, type='js')
     info['velocity_divergence'] = velocity_divergence
 
     return info
@@ -96,7 +96,7 @@ def average_velocity(states):
     arg_v = nanmean(vehicle_avg_v)
     return arg_v
 
-def divergence(p, q, type='js', n_components=0):
+def divergence(p, q, type='js', n_components=-1):
     """
     Calculate a divergence between p and q
     Args:
@@ -122,7 +122,6 @@ def divergence(p, q, type='js', n_components=0):
         m_hist = np.histogram(m, bins=m_bins, density=True, weights=m_weights)
         d = .5 * kl_histogram(p, p_hist, m_hist) + .5 * kl_histogram(q, q_hist, m_hist)
         return d
-
     elif type == 'kl':
         if n_components < 0:
             # Use histogram binning to discretize sampled distributions
