@@ -4,6 +4,7 @@ import gym
 import intersim
 import numpy as np
 from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 
 from src import InteractionDatasetSingleAgent, metrics
 from intersim.utils import get_map_path, get_svt
@@ -63,7 +64,10 @@ def main(config, method='bc', train=False, test=False, loc=0, datadir='./expert_
 
         # run test metrics
         test_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=[track])
-        metrics(filestr, test_dataset, policy)
+        writer = SummaryWriter(filestr)
+        info = metrics(filestr, test_dataset, policy)
+        for k, m in info.items():
+            writer.add_scalar('test/{}'.format(k), m, 0)
 
 
 def simulate_policy(policy, loc=0, track=0, filestr='', nframes=float('inf'), graph=None):
