@@ -34,17 +34,14 @@ class DeepSetsPolicy(Policy, nn.Module):
             sample (dict): sample dictionary with the following entries:
                 state (torch.tensor): (B, 5) raw state
                 relative_state (torch.tensor): (B, max_nv, d) relative state (padded with nans)
-                path_x (torch.tensor): (B, P) tensor of P future path x positions
-                path_y (torch.tensor): (B, P) tensor of P future path y positions
+                path (torch.tensor): (B, P, 2) tensor of P future path x and y positions
                 action (torch.tensor): (B, 1) actions taken from each state
         Returns:
             x (torch.tensor): (head_output_dim,) output of common head network
         """
-        ego = self.ego_net(sample["state"])
+        ego = self.ego_net(sample["ego_state"])
         relative = self.deepsets_net(sample["relative_state"])
-        # cat path_x, path_y to tensor of dim (B, 2*P)
-        path = torch.cat([sample["path_x"], sample["path_y"]], dim=-1)
-        path = self.path_net(path)
+        path = self.path_net(sample["path"].reshape((sample["path"].shape[0], -1)))
         x = torch.cat([ego, relative, path], dim=-1)
         x = self.head(x)
         return x

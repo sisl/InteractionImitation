@@ -48,6 +48,8 @@ def parse_args():
         help='seed')    
     parser.add_argument('--nframes', default=500, type=int,
         help='frames for test animation') 
+    parser.add_argument('--nsamples', default=200, type=int,
+        help='number of ray samples') 
     parser.add_argument('--graph', action='store_true',
         help='whether to mask the relative states based on a ConeVisibilityGraph')
     parser.add_argument('-d', default='./expert_data', type=str,
@@ -64,6 +66,7 @@ def parse_args():
         'seed':args.seed,
         'ray':args.ray,
         'nframes':args.nframes,
+        'nsamples':args.nsamples,
         'datadir':os.path.abspath(args.d),
         'graph':None,
         'outdir': opj('output',args.method,'loc%02i'%(args.loc)),
@@ -156,7 +159,7 @@ if __name__ == '__main__':
             local_dir=kwargs['outdir'],
             #resources_per_trial={"cpu": 2},
             time_budget_s=120*60,
-            num_samples=200,
+            num_samples=kwargs['nsamples'],
         )
     elif kwargs['ray'] and kwargs['test']:
         analysis = Analysis(kwargs['outdir'], default_metric="cv_loss", default_mode="min")

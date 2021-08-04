@@ -48,8 +48,8 @@ def main(config, method='bc', train=False, test=False, loc=0, datadir='./expert_
 
         # make policy, train and test datasets, and send to 
         policy = policy_class(config)
-        train_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=[0,1,2])
-        cv_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=[3])
+        train_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=kwargs['train_tracks'])
+        cv_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=kwargs['cv_tracks'])
         train_fn(config, policy, train_dataset, cv_dataset, filestr, **kwargs)
     
     if test:
@@ -59,11 +59,10 @@ def main(config, method='bc', train=False, test=False, loc=0, datadir='./expert_
         policy.eval()
 
         # simulate policy
-        track = 4
-        simulate_policy(policy, loc=loc, track=track, filestr=filestr, nframes=kwargs['nframes'], graph=kwargs['graph'])
+        simulate_policy(policy, loc=loc, track=kwargs['test_tracks'][0], filestr=filestr, nframes=kwargs['nframes'], graph=kwargs['graph'])
 
         # run test metrics
-        test_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=[track])
+        test_dataset = InteractionDatasetSingleAgent(output_dir=datadir, loc=loc, tracks=kwargs['test_tracks'])
         writer = SummaryWriter(filestr)
         info = metrics(filestr, test_dataset, policy)
         for k, m in info.items():

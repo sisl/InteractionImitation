@@ -80,16 +80,16 @@ class BehaviorCloningPolicy():
 
     def __call__(self, ob):
 
-        if 'action' in ob.keys():
+        if 'ego_state' in ob.keys():
             # extract state from dataloader samples  
             pass
         else:
             # extract state from observation (using simulator)
-            ob['path_x'] = ob['paths'][0]
-            ob['path_y'] = ob['paths'][1]
+            ob['ego_state'] = ob['state']
+            ob['path'] = torch.stack(ob['paths'],dim=-1)
 
         # run observation through transforms
-        for key in ['state', 'relative_state', 'path_x', 'path_y']:             
+        for key in ['ego_state', 'relative_state', 'path']:             
             if key in self._transforms.keys():
                 ob[key] = self._transforms[key].transform(ob[key])
 
@@ -149,13 +149,15 @@ def generate_transforms(dataset):
     """
     transforms = {
         'action': MinMaxScaler(),
-        'state': MinMaxScaler(),
+        'ego_state': MinMaxScaler(),
         'relative_state': MinMaxScaler(reduce_dim=2),
-        'path_x': MinMaxScaler(reduce_dim=2),
-        'path_y': MinMaxScaler(reduce_dim=2),
+        'path': MinMaxScaler(reduce_dim=2),
     }
     for key in transforms.keys():
-        transforms[key].fit(dataset[:][key])
+        if key == 'action':
+            transforms[key].fit(dataset[:][key])
+        else:
+            transforms[key].fit(dataset[:]['state'][key])
 
     return transforms
 
@@ -190,7 +192,7 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     cv_loader = DataLoader(cv_dataset, batch_size=cv_batch_size, shuffle=True)
 
     # change policy dtype
-    policy.policy = policy.policy.type(train_dataset[0]['state'].dtype)
+    policy.policy = policy.policy.type(train_dataset[0]['state']['ego_state'].dtype)
 
     # generate loss function, optimizer
     cv_loss_fn = nn.MSELoss(reduction='sum')
@@ -220,7 +222,7 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
         for (batch_idx, batch) in enumerate(training_loader):
             
             # sample mini-batch and run through policy
-            pred_action = policy(batch) 
+            pred_action = policy(batch['state']) 
             loss = loss_fn(pred_action, batch['action'])
 
             # compute loss and step optimizer
@@ -239,7 +241,7 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
             with torch.no_grad():
                 cv_loss = 0.
                 for (batch_idx, batch) in enumerate(cv_loader):
-                    pred_action = policy(batch) 
+                    pred_action = policy(batch['state']) 
                     loss = cv_loss_fn(pred_action, batch['action'])
                     cv_loss += loss.item() / len(cv_dataset)
             

@@ -37,7 +37,7 @@ def metrics(filestr: str, test_dataset, policy):
     info['average_velocity'] = avg_v
 
     # convert policy dtype between float32 and float64
-    policy.policy = policy.policy.type(test_dataset[0]['state'].dtype)
+    policy.policy = policy.policy.type(test_dataset[0]['state']['ego_state'].dtype)
     
     # generate actions in test dataset
     true_actions, pred_actions = [], []
@@ -45,9 +45,9 @@ def metrics(filestr: str, test_dataset, policy):
     test_loader = DataLoader(test_dataset, batch_size=1024)
     with torch.no_grad():
         for (batch_idx, batch) in enumerate(test_loader):
-            pred_actions.append(policy(batch))
+            pred_actions.append(policy(batch['state']))
             true_actions.append(batch['action'])
-            true_velocities.append(batch['state'][:,2])
+            true_velocities.append(batch['state']['ego_state'][:,2])
 
     true_actions, pred_actions = torch.cat(true_actions,dim=0), torch.cat(pred_actions, dim=0)
     visualize_distribution(true_actions[:,0], pred_actions[:,0], filestr+'_action_viz') 
