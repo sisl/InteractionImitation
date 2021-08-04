@@ -123,7 +123,7 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     cv_loader = DataLoader(cv_dataset, batch_size=cv_batch_size, shuffle=True)
 
     # change policy dtype
-    policy.policy = policy.policy.type(train_dataset[0]['state'].dtype)
+    policy.policy = policy.policy.type(train_dataset[0]['state']['ego_state'].dtype)
 
     # generate loss function, optimizer
     cv_loss_fn = nn.MSELoss(reduction='sum')
@@ -150,7 +150,7 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
         for (batch_idx, batch) in enumerate(training_loader):
             
             # sample mini-batch and run through policy
-            pred_action = policy(batch) 
+            pred_action = policy(batch['state']) 
             loss = loss_fn(pred_action, batch['action'])
 
             # compute loss and step optimizer
@@ -169,7 +169,7 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
             with torch.no_grad():
                 cv_loss = 0.
                 for (batch_idx, batch) in enumerate(cv_loader):
-                    pred_action = policy(batch) 
+                    pred_action = policy(batch['state']) 
                     loss = cv_loss_fn(pred_action, batch['action'])
                     cv_loss += loss.item() / len(cv_dataset)
             

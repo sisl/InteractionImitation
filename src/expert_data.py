@@ -31,8 +31,8 @@ def generate_expert_data(path: str='expert_data', loc: int = 0, track:int = 0,
         os.makedirs(path)
     filestr = opj(path,intersim.LOCATIONS[loc]+'_track%03i'%(track))
     
-    svt, svt_path = get_svt(base='InteractionSimulator', loc=loc, track=track)
-    osm = get_map_path(base='InteractionSimulator', loc=loc)
+    svt, svt_path = get_svt(loc=loc, track=track) #base='InteractionSimulator'
+    osm = get_map_path(loc=loc)
     print('SVT path: {}'.format(svt_path))
     print('Map path: {}'.format(osm))
     states, actions = SVT_to_stateactions(svt)
@@ -91,33 +91,42 @@ def process_expert_observations(obs, actions, filestr, remove_outliers=True, dty
         remove_outliers (bool): whether to remove datapoints with acceleration above or below 5 m/s/s
         dtype (torch.Type): type to convert data to
     """
-    keys = ['state', 'action', 'relative_state', 'path_x', 'path_y']
+    keys = ['ego_state', 'relative_state', 'path', 'action', 'next_ego_state', 'next_relative_state', 'next_path']
     data = {key:[] for key in keys}
     assert len(obs) == len(actions), 'non-matching action and observation lengths'
     T = len(obs)
     max_nv = 0
-    for t in range(T):
-        nni = ~torch.isnan(obs[t]['state'][:,0])
+    for t in range(T-1):
+        nni = ~torch.isnan(obs[t]['state'][:,0]) & ~torch.isnan(obs[t+1]['state'][:,0]) 
         max_nv = max(max_nv,nni.count_nonzero())
-        data['state'].append(obs[t]['state'][nni])
+
+        # state
+        data['ego_state'].append(obs[t]['state'][nni])
         data['relative_state'].append(obs[t]['relative_state'].index_select(0, 
             nni.nonzero()[:,0]).index_select(1, nni.nonzero()[:,0]))
-        data['action'].append(actions[t][nni])
-        data['path_x'].append(obs[t]['paths'][0][nni])
-        data['path_y'].append(obs[t]['paths'][1][nni])
+        data['path'].append(torch.stack((obs[t]['paths'][0][nni], obs[t]['paths'][1][nni]), dim=-1))
 
-    # cat lists 
-    data['state'] = torch.cat(data['state']).type(dtype)
-    data['action'] = torch.cat(data['action']).type(dtype)
-    data['path_x'] = torch.cat(data['path_x']).type(dtype)
-    data['path_y'] = torch.cat(data['path_y']).type(dtype)
+        # action
+        data['action'].append(actions[t][nni])
+
+        # next state
+        data['next_ego_state'].append(obs[t+1]['state'][nni])
+        data['next_relative_state'].append(obs[t+1]['relative_state'].index_select(0, 
+            nni.nonzero()[:,0]).index_select(1, nni.nonzero()[:,0]))
+        data['next_path'].append(torch.stack((obs[t+1]['paths'][0][nni], obs[t+1]['paths'][1][nni]), dim=-1))
+
+    
 
     # pad second dimension of relative state
     for i in range(len(data['relative_state'])):
         nv1, nv2, d = data['relative_state'][i].shape
         pad = torch.zeros(nv1, max_nv-nv2, d, dtype=dtype) * np.nan
         data['relative_state'][i] = torch.cat((data['relative_state'][i], pad), dim=1)
-    data['relative_state'] = torch.cat(data['relative_state']).type(dtype)
+        data['next_relative_state'][i] = torch.cat((data['next_relative_state'][i], pad), dim=1)
+
+    # cat lists 
+    for key in keys:
+        data[key] = torch.cat(data[key]).type(dtype)
 
     if remove_outliers:
         non_outlier_indices = torch.nonzero(torch.abs(data['action'][:,0]) < 5)
@@ -125,12 +134,11 @@ def process_expert_observations(obs, actions, filestr, remove_outliers=True, dty
             data[key] = data[key][non_outlier_indices[:,0]]    
 
     # mandate equal length
-    assert len(data['state']) == len(data['relative_state']) \
-        == len(data['action']) == len(data['path_x']) \
-        == len(data['path_y']), 'dataset lengths unequal'
+    lengths = [len(data[key]) for key in keys]
+    assert min(lengths) == max(lengths), 'dataset lengths unequal'
 
     # save out data
-    for key in data.keys():
+    for key in keys:
         torch.save(data[key], filestr+'_'+key+'.pt')
 
 def load_expert_data(path='expert_data', loc: int = 0, track:int = 0):
@@ -146,7 +154,8 @@ def load_expert_data(path='expert_data', loc: int = 0, track:int = 0):
     # load observations and actions
     filestr = opj(path, intersim.LOCATIONS[loc]+'_track%03i'%(track))
     data = {}
-    for key in ['state','action','relative_state','path_x','path_y']:
+    keys = ['ego_state', 'relative_state', 'path', 'action', 'next_ego_state', 'next_relative_state', 'next_path']
+    for key in keys:
         data[key] = torch.load(filestr+'_'+key+'.pt')
     return data
 

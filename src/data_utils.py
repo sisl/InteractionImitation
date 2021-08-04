@@ -25,13 +25,14 @@ class InteractionDatasetSingleAgent(Dataset):
         self.loc = loc
         self.tracks = tracks
         self.dtype = dtype
+        self.keys = ['ego_state', 'relative_state', 'path', 'action', 'next_ego_state', 'next_relative_state', 'next_path']
         self._load_dataset()
 
     def _load_dataset(self):
         """
         Load the full datasets ahead of time
         """
-        self.raw_data = {'state':[], 'relative_state':[], 'action':[], 'path_x':[], 'path_y':[]}
+        self.raw_data = {key:[] for key in self.keys}
         max_nv = 0
         for track in self.tracks:
             try:
@@ -41,33 +42,26 @@ class InteractionDatasetSingleAgent(Dataset):
                 print('Failed to load location {} track {}'.format(self.loc,track))
                 continue
             max_nv = max(max_nv, data['relative_state'].shape[1])
-            self.raw_data['state'].append(data['state'])
-            self.raw_data['relative_state'].append(data['relative_state'])
-            self.raw_data['action'].append(data['action'])
-            self.raw_data['path_x'].append(data['path_x'])
-            self.raw_data['path_y'].append(data['path_y'])
-
-        # cat lists
-        self.raw_data['state'] = torch.cat(self.raw_data['state']).type(self.dtype)
-        self.raw_data['action'] = torch.cat(self.raw_data['action']).type(self.dtype)
-        self.raw_data['path_x'] = torch.cat(self.raw_data['path_x']).type(self.dtype)
-        self.raw_data['path_y'] = torch.cat(self.raw_data['path_y']).type(self.dtype)
+            for key in self.keys:
+                self.raw_data[key].append(data[key])
 
         # pad second dimension of relative state
         for i in range(len(self.raw_data['relative_state'])):
             nv1, nv2, d = self.raw_data['relative_state'][i].shape
             pad = torch.zeros(nv1, max_nv-nv2, d, dtype=self.dtype) * np.nan
             self.raw_data['relative_state'][i] = torch.cat((self.raw_data['relative_state'][i], pad), dim=1)
-        self.raw_data['relative_state'] = torch.cat(self.raw_data['relative_state']).type(self.dtype)
+            self.raw_data['next_relative_state'][i] = torch.cat((self.raw_data['next_relative_state'][i], pad), dim=1)
+
+        # cat lists
+        for key in self.keys:
+            self.raw_data[key] = torch.cat(self.raw_data[key]).type(self.dtype)
 
         # mandate equal length
-        assert len(self.raw_data['state']) == len(self.raw_data['relative_state']) \
-            == len(self.raw_data['action']) \
-            == len(self.raw_data['path_x']) \
-            == len(self.raw_data['path_y']), 'dataset lengths unequal'
+        lengths = [len(self.raw_data[key]) for key in self.keys]
+        assert min(lengths) == max(lengths), 'dataset lengths unequal'
         
     def __len__(self):
-        return len(self.raw_data['state'])
+        return len(self.raw_data['ego_state'])
 
     def __getitem__(self, idx):
         """ 
@@ -76,12 +70,27 @@ class InteractionDatasetSingleAgent(Dataset):
             idx: index or indices of B samples
         Returns:
             sample (dict): sample dictionary with the following entries:
-                state (torch.tensor): (B, 5) raw state
-                relative_state (torch.tensor): (B, max_nv, d) relative state (padded with nans)
-                path_x (torch.tensor): (B, P) tensor of P future path x positions
-                path_y (torch.tensor): (B, P) tensor of P future path y positions
+                state (dict): state dictionary with the following entries:
+                    ego_state (torch.tensor): (B, 5) raw state
+                    relative_state (torch.tensor): (B, max_nv, d) relative state (padded with nans)
+                    path (torch.tensor): (B, P, 2) tensor of P future path x and y positions
                 action (torch.tensor): (B, 1) actions taken from each state
+                next_stat (dict): next state dictionary with the following entries:
+                    ego_state (torch.tensor): (B, 5) raw next state
+                    relative_state (torch.tensor): (B, max_nv, d) next relative state (padded with nans)
+                    path (torch.tensor): (B, P, 2) tensor of P future next path x and y positions
         """
-        keys = ['state', 'relative_state', 'path_x', 'path_y', 'action']
-        sample = {key:self.raw_data[key][idx] for key in keys}
+        #sample = {key:self.raw_data[key][idx] for key in self.keys}
+        sample = {
+            'state':{
+                'ego_state':self.raw_data['ego_state'][idx],
+                'relative_state':self.raw_data['relative_state'][idx],
+                'path':self.raw_data['path'][idx]
+            },
+            'action':self.raw_data['action'][idx],
+            'next_state':{
+                'ego_state':self.raw_data['next_ego_state'][idx],
+                'relative_state':self.raw_data['next_relative_state'][idx],
+                'path':self.raw_data['next_path'][idx]},
+        }
         return sample

@@ -31,17 +31,14 @@ class IntersimStateNet(nn.Module):
             sample (dict): sample dictionary with the following entries:
                 state (torch.tensor): (B, 5) raw state
                 relative_state (torch.tensor): (B, max_nv, d) relative state (padded with nans)
-                path_x (torch.tensor): (B, P) tensor of P future path x positions
-                path_y (torch.tensor): (B, P) tensor of P future path y positions
+                path (torch.tensor): (B, P, 2) tensor of P future path x and y positions
                 action (torch.tensor): (B, 1) actions taken from each state
         Returns:
             x (torch.tensor): (head_output_dim,) output of common head network
         """
         ego = self.ego_net(sample["ego_state"])
         relative = self.deepsets_net(sample["relative_state"])
-        # cat path_x, path_y to tensor of dim (B, 2*P)
-        path = torch.cat([sample["path_x"], sample["path_y"]], dim=-1)
-        path = self.path_net(path)
+        path = self.path_net(sample["path"].reshape((sample["path"].shape[0], -1)))
         x = torch.cat([ego, relative, path], dim=-1)
         x = self.head(x)
         return x
@@ -127,13 +124,13 @@ class IntersimPolicy():
 
     def __call__(self, ob):
 
-        if 'action' in ob.keys():
+        if 'ego_state' in ob.keys():
             # extract state from dataloader samples  
             pass
         else:
             # extract state from observation (using simulator)
-            ob['path_x'] = ob['paths'][0]
-            ob['path_y'] = ob['paths'][1]
+            ob['ego_state'] = ob['state']
+            ob['path'] = torch.stack(ob['paths'],dim=-1)
 
         ob = transform_observation(ob)
 
@@ -155,12 +152,14 @@ def generate_transforms(dataset):
     """
     transforms = {
         'action': MinMaxScaler(),
-        'state': MinMaxScaler(),
+        'ego_state': MinMaxScaler(),
         'relative_state': MinMaxScaler(reduce_dim=2),
-        'path_x': MinMaxScaler(reduce_dim=2),
-        'path_y': MinMaxScaler(reduce_dim=2),
+        'path': MinMaxScaler(reduce_dim=2),
     }
     for key in transforms.keys():
-        transforms[key].fit(dataset[:][key])
+        if key == 'action':
+            transforms[key].fit(dataset[:][key])
+        else:
+            transforms[key].fit(dataset[:]['state'][key])
 
     return transforms
