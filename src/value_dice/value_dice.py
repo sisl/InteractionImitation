@@ -2,66 +2,40 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import pickle
+import itertools
 from torch.utils.tensorboard import SummaryWriter
 
-from src.policies import IntersimDeepSetsNet, IntersimPolicy, generate_transforms
+from src.policies import IntersimStateNet, IntersimStateActionNet, IntersimPolicy, generate_transforms
 from src.util.transform import MinMaxScaler
 from src.util.nn_training import optimizer_factory
 from tqdm import tqdm
 import json5
 from ray import tune
 
-def bc_config(ray_config):
-    config = {
-        'ego_encoder': {'input_dim': 5, 'hidden_n': 0, 'hidden_dim':0, 'output_dim': 0},
-        'deepsets': {
-            'input_dim': 6,
-            'phi': {
-                'hidden_n': ray_config['deepsets_phi_hidden_n'],
-                'hidden_dim': ray_config['deepsets_phi_hidden_dim']
-                },
-            'latent_dim': ray_config['deepsets_latent_dim'],
-            'rho': {
-                'hidden_n': ray_config['deepsets_rho_hidden_n'],
-                'hidden_dim': ray_config['deepsets_rho_hidden_dim']
-                },
-            'output_dim': ray_config['deepsets_output_dim']
-        },
-        'path_encoder': {'input_dim': 40, 'hidden_n': 0, 'hidden_dim': 0, 'output_dim': 0},
-        'head': {
-            'input_dim': 0, # computed in constructor
-            'hidden_n': ray_config['head_hidden_n'],
-            'hidden_dim': ray_config['head_hidden_dim'],
-            'output_dim': 1, # number of outputs e.g. number of actions, or just one
-            'final_activation': ray_config['head_final_activation'],
-        },
-        'optim': {
-            'optimizer':'adam',
-            'lr':ray_config['lr'],
-            'weight_decay':ray_config['weight_decay']
-        },
-        'train_epochs': 40,
-        'train_batch_size': ray_config['train_batch_size'],
-        'loss': ray_config['loss'],
-
-    }
-    return config
-
-class BehaviorCloningPolicy(IntersimPolicy):
+class ValueDicePolicy(IntersimPolicy):
     """
-    Class for (continuous) behavior cloning policy
+    Class for value dice policy
     """
     
     def __init__(self, config: dict, transforms: dict):
         """
-        Initialize BehaviorCloningPolicy
+        Initialize ValueDicePolicy
         Args:
             config (dict): configuration file to initialize IntersimDeepSetsNet with
             transforms (dict): dictionary of transforms to apply to different fields
         """
-        super(BehaviorCloningPolicy, self).__init__(config, transforms)
-        self._policy = IntersimStateNet(config)
+        super(ValueDicePolicy, self).__init__(config, transforms)
+        self._policy = IntersimStateNet(config["policy_net"])
+        self._value = IntersimStateActionNet(config["value_net"])
         
+    @property 
+    def value(self):
+        return self._value
+    
+    @policy.setter
+    def value(self, value):
+        self._value = value
+
     @classmethod
     def load_model(cls, filestr: str, config: dict = None):
         """
@@ -77,14 +51,24 @@ class BehaviorCloningPolicy(IntersimPolicy):
                 config = json5.load(cfg)
         transforms = pickle.load(open(filestr+'_transforms.pkl', 'rb'))
         model = cls(config, transforms=transforms)
-        model._policy.load_state_dict(torch.load(filestr+'_model.pt'))
+        model._policy.load_state_dict(torch.load(filestr+'_policy.pt'))
+        model._value.load_state_dict(torch.load(filestr+'_value.pt'))
         return model
     
-    def eval(self):
-        self._policy.eval()
-
     def parameters(self):
-        return self._policy.parameters()
+        return itertools.chain(self._policy.parameters(), self._value.parameters())
+
+    @property
+    def policy_parameters(self):
+        return self.policy.parameters()
+
+    @property
+    def value_parameters(self):
+        return self.value.parameters()
+
+    def eval(self):
+        self.policy.eval()
+        self.value.eval()
 
     def save_model(self, filestr, save_config=True, save_transforms=True):
         """
@@ -99,7 +83,10 @@ class BehaviorCloningPolicy(IntersimPolicy):
                 json5.dump(self._config, cfg)
         if save_transforms:
             pickle.dump(self._transforms, open(filestr+'_transforms.pkl', 'wb'))
-        torch.save(self._policy.state_dict(), filestr+'_model.pt')
+        torch.save(self._policy.state_dict(), filestr+'_policy.pt')
+        torch.save(self._value.state_dict(), filestr+'_value.pt')
+
+
 
 def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     
@@ -111,6 +98,7 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     loss_type = config['loss']
     train_epochs = config['train_epochs']
     train_batch_size = config['train_batch_size']
+    discount = config['discount']
 
     cv_every = 1
     print_epoch_every = 1000
@@ -125,15 +113,47 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     # change policy dtype
     policy.policy = policy.policy.type(train_dataset[0]['state'].dtype)
 
-    # generate loss function, optimizer
-    cv_loss_fn = nn.MSELoss(reduction='sum')
-    if loss_type == 'huber':
-        loss_fn = nn.HuberLoss(reduction='sum') 
-    elif loss_type == 'mse':
-        loss_fn = nn.MSELoss(reduction='sum')
-    else:
-        raise NotImplementedError
-    optimizer = optimizer_factory(config['optim'], policy.parameters)
+    # define loss function
+    def f_value_dice_loss(batch)
+        # get s, a, s', s_0 from batch
+        state = batch['state']
+        action = batch['action']
+        next_state = batch['next_state']
+        initial_state = state
+
+        ### Linear loss
+        
+        # append action to state batches
+        #   use expert action for s
+        state['action'] = action
+        #   run s' and s_0 through policy
+        initial_state['action'] = policy(next_state)
+        next_state['action'] = policy(initial_state)
+
+        # transform state and action before inputting to value network
+        # (for the policy network this is done in policy.__call__() )
+        state = policy.transform_observation(state)
+        initial_state = policy.transform_observation(initial_state)
+        next_state = policy.transform_observation(next_state)
+
+        # evaluate value network
+        value = policy.value(state)
+        value_init = policy.value(initial_state)  
+        value_next = policy.value(next_batch)
+
+        value_diff = value - discount * value_next
+
+        linear_loss = (1 - discount) * torch.mean(value_init)
+
+        ### Nonlinear loss
+        nonlinear_loss = torch.logsumexp(value_diff)
+
+        loss = nonlinear_loss - linear_loss
+        return loss
+
+
+    policy_optimizer = optimizer_factory(config['policy_optim'], policy.policy_parameters)
+    value_optimizer = optimizer_factory(config['value_optim'], policy.value_parameters)
 
     # generate tensorboard writer
     if not using_ray:
@@ -148,29 +168,32 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
         # train
         epoch_loss = 0
         for (batch_idx, batch) in enumerate(training_loader):
-            
-            # sample mini-batch and run through policy
-            pred_action = policy(batch) 
-            loss = loss_fn(pred_action, batch['action'])
+
+            loss = f_value_dice_loss(batch)
+
+            # TODO: Regularization
+            policy_loss = -loss #+ ORTHOGONAL_REGULARIZER
+            value_loss = loss #+ GRADIENT_REGULARIZER
 
             # compute loss and step optimizer
-            optimizer.zero_grad()
+            policy_optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            policy_optimizer.step()
+            value_optimizer.zero_grad()
+            value_loss.backward()
+            value_optimizer.step()
 
             epoch_loss += loss.item() / len(train_dataset)
         
         # if i % print_epoch_every == 0:
         #     print('Epoch: {}, Training Loss: {}'.format(i, epoch_loss))
 
-                # measure cv loss
-
+        # measure cv loss
         if i % cv_every == 0:
             with torch.no_grad():
                 cv_loss = 0.
                 for (batch_idx, batch) in enumerate(cv_loader):
-                    pred_action = policy(batch) 
-                    loss = cv_loss_fn(pred_action, batch['action'])
+                    loss = f_value_dice_loss(batch)
                     cv_loss += loss.item() / len(cv_dataset)
             
             

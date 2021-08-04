@@ -4,16 +4,13 @@ from torch import nn
 
 from src.nets.deepsets import DeepSetsModule, Phi
 
-class Policy:
-    pass
-
-class DeepSetsPolicy(Policy, nn.Module):
+class IntersimStateNet(nn.Module):
     def __init__(self, config):
         """
         Args:
             config (dict): dictionary for configuring the deep sets policy
         """
-        super(DeepSetsPolicy, self).__init__()
+        super(IntersimStateNet, self).__init__()
         ego_config = config['ego_encoder']
         deepsets_config = config['deepsets']
         pathnet_config = config['path_encoder']
@@ -40,7 +37,7 @@ class DeepSetsPolicy(Policy, nn.Module):
         Returns:
             x (torch.tensor): (head_output_dim,) output of common head network
         """
-        ego = self.ego_net(sample["state"])
+        ego = self.ego_net(sample["ego_state"])
         relative = self.deepsets_net(sample["relative_state"])
         # cat path_x, path_y to tensor of dim (B, 2*P)
         path = torch.cat([sample["path_x"], sample["path_y"]], dim=-1)
@@ -48,3 +45,122 @@ class DeepSetsPolicy(Policy, nn.Module):
         x = torch.cat([ego, relative, path], dim=-1)
         x = self.head(x)
         return x
+
+
+class IntersimStateActionNet(nn.Module):
+    def __init__(self, config):
+        """
+        Args:
+            config (dict): dictionary for configuring the deep sets policy
+        """
+        super(IntersimStateActionNet, self).__init__()
+        ego_config = config['ego_encoder']
+        deepsets_config = config['deepsets']
+        pathnet_config = config['path_encoder']
+
+        self.ego_net = Phi.from_config(ego_config)
+        self.deepsets_net = DeepSetsModule.from_config(deepsets_config)
+        self.path_net = Phi.from_config(pathnet_config)
+        self.action_dim = config["action_dim"]
+
+        cat_dim = self.ego_net.output_dim + self.deepsets_net.output_dim + self.path_net.output_dim + self.action_dim
+        # head has number of concatenated features as input
+        head_config = config['head']
+        head_config["input_dim"] = cat_dim
+        self.head = Phi.from_config(head_config)
+
+    def forward(self, sample):
+        """
+        Args:
+            sample (dict): sample dictionary with the following entries:
+                state (torch.tensor): (B, 5) raw state
+                relative_state (torch.tensor): (B, max_nv, d) relative state (padded with nans)
+                path_x (torch.tensor): (B, P) tensor of P future path x positions
+                path_y (torch.tensor): (B, P) tensor of P future path y positions
+                action (torch.tensor): (B, 1) actions taken from each state
+        Returns:
+            x (torch.tensor): (head_output_dim,) output of common head network
+        """
+        ego = self.ego_net(sample["ego_state"])
+        relative = self.deepsets_net(sample["relative_state"])
+        # cat path_x, path_y to tensor of dim (B, 2*P)
+        path = torch.cat([sample["path_x"], sample["path_y"]], dim=-1)
+        path = self.path_net(path)
+        action = sample["action"]
+        x = torch.cat([ego, relative, path, action], dim=-1)
+        x = self.head(x)
+        return x
+
+
+class IntersimPolicy():
+    """
+    Base class for intersim policies
+    """
+    def __init__(self, config, transforms):
+        super(IntersimPolicy, self).__init__()
+        self._config = config
+        self._transforms = transforms
+
+    @property
+    def transforms(self):
+        return self._transforms
+    
+    @transforms.setter
+    def transforms(self, transforms):
+        self._transforms=transforms
+
+    @property 
+    def policy(self):
+        return self._policy
+    
+    @policy.setter
+    def policy(self, policy):
+        self._policy = policy
+
+    def transform_observation(self, ob):
+        # run observation through transforms
+        transformed_ob = {}
+        for key in ['ego_state', 'relative_state', 'path', 'action']:             
+            if key in self._transforms.keys():
+                transformed_ob[key] = self._transforms[key].transform(ob[key])
+        return transformed_ob
+
+    def __call__(self, ob):
+
+        if 'action' in ob.keys():
+            # extract state from dataloader samples  
+            pass
+        else:
+            # extract state from observation (using simulator)
+            ob['path_x'] = ob['paths'][0]
+            ob['path_y'] = ob['paths'][1]
+
+        ob = transform_observation(ob)
+
+        # run transformed state through model
+        action = self._policy(ob)
+        assert action.ndim == 2, 'action has incorrect shape'
+
+        # untransform action
+        if 'action' in self._transforms.keys():
+            action = self._transforms['action'].inverse_transform(action)
+        return action
+
+
+def generate_transforms(dataset):
+    """
+    Generate transform dictionary from dataset
+    Args:
+        dataset (Dataset): dataset of demo observations and actions
+    """
+    transforms = {
+        'action': MinMaxScaler(),
+        'state': MinMaxScaler(),
+        'relative_state': MinMaxScaler(reduce_dim=2),
+        'path_x': MinMaxScaler(reduce_dim=2),
+        'path_y': MinMaxScaler(reduce_dim=2),
+    }
+    for key in transforms.keys():
+        transforms[key].fit(dataset[:][key])
+
+    return transforms
