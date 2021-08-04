@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument("--test", help="test model",
         action="store_true") 
     parser.add_argument("--method", help="modeling method",
-        choices=['bc', 'gail', 'advil'], default='bc')
+        choices=['bc', 'gail', 'advil', 'vd'], default='bc')
     parser.add_argument("--config", help="config file path",
         default=None, type=str)
     parser.add_argument('--seed', default=0, type=int,

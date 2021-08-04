@@ -11,6 +11,41 @@ from src.util.nn_training import optimizer_factory
 from tqdm import tqdm
 import json5
 from ray import tune
+def vd_config(ray_config):
+    config = {
+        'ego_encoder': {'input_dim': 5, 'hidden_n': 0, 'hidden_dim':0, 'output_dim': 0},
+        'deepsets': {
+            'input_dim': 6,
+            'phi': {
+                'hidden_n': ray_config['deepsets_phi_hidden_n'],
+                'hidden_dim': ray_config['deepsets_phi_hidden_dim']
+                },
+            'latent_dim': ray_config['deepsets_latent_dim'],
+            'rho': {
+                'hidden_n': ray_config['deepsets_rho_hidden_n'],
+                'hidden_dim': ray_config['deepsets_rho_hidden_dim']
+                },
+            'output_dim': ray_config['deepsets_output_dim']
+        },
+        'path_encoder': {'input_dim': 40, 'hidden_n': 0, 'hidden_dim': 0, 'output_dim': 0},
+        'head': {
+            'input_dim': 0, # computed in constructor
+            'hidden_n': ray_config['head_hidden_n'],
+            'hidden_dim': ray_config['head_hidden_dim'],
+            'output_dim': 1, # number of outputs e.g. number of actions, or just one
+            'final_activation': ray_config['head_final_activation'],
+        },
+        'optim': {
+            'optimizer':'adam',
+            'lr':ray_config['lr'],
+            'weight_decay':ray_config['weight_decay']
+        },
+        'train_epochs': 40,
+        'train_batch_size': ray_config['train_batch_size'],
+        'loss': ray_config['loss'],
+
+    }
+    return config
 
 class ValueDicePolicy(IntersimPolicy):
     """
@@ -32,7 +67,7 @@ class ValueDicePolicy(IntersimPolicy):
     def value(self):
         return self._value
     
-    @policy.setter
+    @value.setter
     def value(self, value):
         self._value = value
 
@@ -58,11 +93,9 @@ class ValueDicePolicy(IntersimPolicy):
     def parameters(self):
         return itertools.chain(self._policy.parameters(), self._value.parameters())
 
-    @property
     def policy_parameters(self):
         return self.policy.parameters()
 
-    @property
     def value_parameters(self):
         return self.value.parameters()
 
@@ -95,7 +128,6 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
         print('using ray')
 
     # hyperparams
-    loss_type = config['loss']
     train_epochs = config['train_epochs']
     train_batch_size = config['train_batch_size']
     discount = config['discount']
@@ -111,24 +143,24 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     cv_loader = DataLoader(cv_dataset, batch_size=cv_batch_size, shuffle=True)
 
     # change policy dtype
-    policy.policy = policy.policy.type(train_dataset[0]['state'].dtype)
+    dtype = train_dataset[0]['state']['ego_state'].dtype
+    policy.policy = policy.policy.type(dtype)
+    policy.value = policy.value.type(dtype)
 
     # define loss function
-    def f_value_dice_loss(batch)
+    def f_value_dice_loss(batch):
         # get s, a, s', s_0 from batch
         state = batch['state']
         action = batch['action']
         next_state = batch['next_state']
         initial_state = state
 
-        ### Linear loss
-        
         # append action to state batches
         #   use expert action for s
         state['action'] = action
         #   run s' and s_0 through policy
-        initial_state['action'] = policy(next_state)
-        next_state['action'] = policy(initial_state)
+        initial_state['action'] = policy(initial_state)
+        next_state['action'] = policy(next_state)
 
         # transform state and action before inputting to value network
         # (for the policy network this is done in policy.__call__() )
@@ -137,23 +169,23 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
         next_state = policy.transform_observation(next_state)
 
         # evaluate value network
-        value = policy.value(state)
-        value_init = policy.value(initial_state)  
-        value_next = policy.value(next_batch)
-
-        value_diff = value - discount * value_next
-
+        value = (policy.value(state))
+        value_init = (policy.value(initial_state))
+        value_next = (policy.value(next_state))
+        
+        # linear loss
         linear_loss = (1 - discount) * torch.mean(value_init)
 
-        ### Nonlinear loss
-        nonlinear_loss = torch.logsumexp(value_diff)
+        # nonlinear loss
+        value_diff = value - discount * value_next
+        nonlinear_loss = torch.logsumexp(value_diff, dim=0)
 
         loss = nonlinear_loss - linear_loss
         return loss
 
 
-    policy_optimizer = optimizer_factory(config['policy_optim'], policy.policy_parameters)
-    value_optimizer = optimizer_factory(config['value_optim'], policy.value_parameters)
+    policy_optimizer = optimizer_factory(config['policy_optim'], policy.policy_parameters())
+    value_optimizer = optimizer_factory(config['value_optim'], policy.value_parameters())
 
     # generate tensorboard writer
     if not using_ray:
@@ -171,13 +203,13 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
 
             loss = f_value_dice_loss(batch)
 
-            # TODO: Regularization
+            # TODO: Regularization is done in original source code
             policy_loss = -loss #+ ORTHOGONAL_REGULARIZER
             value_loss = loss #+ GRADIENT_REGULARIZER
 
             # compute loss and step optimizer
             policy_optimizer.zero_grad()
-            loss.backward()
+            policy_loss.backward(retain_graph=True)
             policy_optimizer.step()
             value_optimizer.zero_grad()
             value_loss.backward()

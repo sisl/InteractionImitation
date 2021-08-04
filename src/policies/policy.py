@@ -3,6 +3,7 @@ import torch
 from torch import nn
 
 from src.nets.deepsets import DeepSetsModule, Phi
+from src.util.transform import MinMaxScaler
 
 class IntersimStateNet(nn.Module):
     def __init__(self, config):
@@ -80,10 +81,8 @@ class IntersimStateActionNet(nn.Module):
         """
         ego = self.ego_net(sample["ego_state"])
         relative = self.deepsets_net(sample["relative_state"])
-        # cat path_x, path_y to tensor of dim (B, 2*P)
-        path = torch.cat([sample["path_x"], sample["path_y"]], dim=-1)
-        path = self.path_net(path)
         action = sample["action"]
+        path = self.path_net(sample["path"].reshape((sample["path"].shape[0], -1)))
         x = torch.cat([ego, relative, path, action], dim=-1)
         x = self.head(x)
         return x
@@ -118,7 +117,7 @@ class IntersimPolicy():
         # run observation through transforms
         transformed_ob = {}
         for key in ['ego_state', 'relative_state', 'path', 'action']:             
-            if key in self._transforms.keys():
+            if key in self._transforms.keys() and key in ob.keys():
                 transformed_ob[key] = self._transforms[key].transform(ob[key])
         return transformed_ob
 
@@ -132,7 +131,7 @@ class IntersimPolicy():
             ob['ego_state'] = ob['state']
             ob['path'] = torch.stack(ob['paths'],dim=-1)
 
-        ob = transform_observation(ob)
+        ob = self.transform_observation(ob)
 
         # run transformed state through model
         action = self._policy(ob)

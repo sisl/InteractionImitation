@@ -1,3 +1,5 @@
+import torch
+
 def optimizer_factory(config, parameters):
     optimizer_type = config['optimizer']
     learning_rate = config['lr']

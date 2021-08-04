@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from src import InteractionDatasetSingleAgent, metrics
 from intersim.utils import get_map_path, get_svt
+from src.policies.policy import generate_transforms
 
 def basestr(**kwargs):
     """
@@ -40,8 +41,12 @@ def main(config, method='bc', train=False, test=False, loc=0, datadir='./expert_
         from src import bc
         policy_class = bc.BehaviorCloningPolicy
         train_fn = bc.train
+    elif method=='vd':
+        from src import value_dice
+        policy_class = value_dice.ValueDicePolicy
+        train_fn = value_dice.train
     else:
-        raise NotImplementedError
+        raise NotImplementedError("Method {} not implemented".format(method))
     
     # default train / cv / test split datasets 
     if train:

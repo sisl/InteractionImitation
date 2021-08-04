@@ -1,1 +1,1 @@
-from src.policies.policy import DeepSetsPolicy
+from src.policies.policy import IntersimPolicy, IntersimStateNet, IntersimStateActionNet, generate_transforms

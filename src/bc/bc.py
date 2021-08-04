@@ -4,8 +4,7 @@ from torch.utils.data import DataLoader
 import pickle
 from torch.utils.tensorboard import SummaryWriter
 
-from src.policies import IntersimDeepSetsNet, IntersimPolicy, generate_transforms
-from src.util.transform import MinMaxScaler
+from src.policies import IntersimStateNet, IntersimPolicy, generate_transforms
 from src.util.nn_training import optimizer_factory
 from tqdm import tqdm
 import json5
@@ -133,7 +132,7 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
         loss_fn = nn.MSELoss(reduction='sum')
     else:
         raise NotImplementedError
-    optimizer = optimizer_factory(config['optim'], policy.parameters)
+    optimizer = optimizer_factory(config['optim'], policy.parameters())
 
     # generate tensorboard writer
     if not using_ray:
