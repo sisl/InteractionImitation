@@ -11,39 +11,72 @@ from src.util.nn_training import optimizer_factory
 from tqdm import tqdm
 import json5
 from ray import tune
+
 def vd_config(ray_config):
     config = {
-        'ego_encoder': {'input_dim': 5, 'hidden_n': 0, 'hidden_dim':0, 'output_dim': 0},
-        'deepsets': {
-            'input_dim': 6,
-            'phi': {
-                'hidden_n': ray_config['deepsets_phi_hidden_n'],
-                'hidden_dim': ray_config['deepsets_phi_hidden_dim']
-                },
-            'latent_dim': ray_config['deepsets_latent_dim'],
-            'rho': {
-                'hidden_n': ray_config['deepsets_rho_hidden_n'],
-                'hidden_dim': ray_config['deepsets_rho_hidden_dim']
-                },
-            'output_dim': ray_config['deepsets_output_dim']
+        'policy_net': {
+            'ego_encoder': {'input_dim': 5, 'hidden_n': 0, 'hidden_dim':0, 'output_dim': 0},
+            'deepsets': {
+                'input_dim': 6,
+                'phi': {
+                    'hidden_n': ray_config['deepsets_phi_hidden_n'],
+                    'hidden_dim': ray_config['deepsets_phi_hidden_dim']
+                    },
+                'latent_dim': ray_config['deepsets_latent_dim'],
+                'rho': {
+                    'hidden_n': ray_config['deepsets_rho_hidden_n'],
+                    'hidden_dim': ray_config['deepsets_rho_hidden_dim']
+                    },
+                'output_dim': ray_config['deepsets_output_dim']
+            },
+            'path_encoder': {'input_dim': 40, 'hidden_n': 0, 'hidden_dim': 0, 'output_dim': 0},
+            'head': {
+                'input_dim': 0, # computed in constructor
+                'hidden_n': ray_config['head_hidden_n'],
+                'hidden_dim': ray_config['head_hidden_dim'],
+                'output_dim': 1, # number of outputs e.g. number of actions, or just one
+                'final_activation': ray_config['head_final_activation'],
+            },
         },
-        'path_encoder': {'input_dim': 40, 'hidden_n': 0, 'hidden_dim': 0, 'output_dim': 0},
-        'head': {
-            'input_dim': 0, # computed in constructor
-            'hidden_n': ray_config['head_hidden_n'],
-            'hidden_dim': ray_config['head_hidden_dim'],
-            'output_dim': 1, # number of outputs e.g. number of actions, or just one
-            'final_activation': ray_config['head_final_activation'],
+        'value_net': {
+            'ego_encoder': {'input_dim': 5, 'hidden_n': 0, 'hidden_dim':0, 'output_dim': 0},
+            'deepsets': {
+                'input_dim': 6,
+                'phi': {
+                    'hidden_n': ray_config['deepsets_phi_hidden_n'],
+                    'hidden_dim': ray_config['deepsets_phi_hidden_dim']
+                    },
+                'latent_dim': ray_config['deepsets_latent_dim'],
+                'rho': {
+                    'hidden_n': ray_config['deepsets_rho_hidden_n'],
+                    'hidden_dim': ray_config['deepsets_rho_hidden_dim']
+                    },
+                'output_dim': ray_config['deepsets_output_dim']
+            },
+            'path_encoder': {'input_dim': 40, 'hidden_n': 0, 'hidden_dim': 0, 'output_dim': 0},
+            'action_dim': 1,
+            'head': {
+                'input_dim': 0, # computed in constructor
+                'hidden_n': ray_config['head_hidden_n'],
+                'hidden_dim': ray_config['head_hidden_dim'],
+                'output_dim': 1, # number of outputs e.g. number of actions, or just one
+                'final_activation': ray_config['head_final_activation'],
+            },
         },
-        'optim': {
+        'policy_optim': {
             'optimizer':'adam',
-            'lr':ray_config['lr'],
-            'weight_decay':ray_config['weight_decay']
+            'lr':ray_config['policy_lr'],
+            'weight_decay':ray_config['policy_weight_decay']
+        },
+        'value_optim': {
+            'optimizer':'adam',
+            'lr':ray_config['value_lr'],
+            'weight_decay':ray_config['value_weight_decay']
         },
         'train_epochs': 40,
         'train_batch_size': ray_config['train_batch_size'],
-        'loss': ray_config['loss'],
-
+        'discount': ray_config['discount'],
+        'clip_grad_norm': ray_config['clip_grad_norm'],
     }
     return config
 

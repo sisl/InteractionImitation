@@ -90,6 +90,9 @@ def get_full_config(ray_config:dict, method:str)->dict:
     if method == 'bc':
         from src.bc import bc_config
         config = bc_config(ray_config)
+    elif method == 'vd':
+        from src.value_dice import vd_config
+        config = vd_config(ray_config)
     else:
         raise NotImplementedError
     return config
@@ -117,6 +120,25 @@ def get_ray_config(method:str)->dict:
             "head_hidden_n": tune.randint(1,6),
             "head_hidden_dim": tune.lograndint(16,257),
             "head_final_activation": tune.choice(['sigmoid', None]),
+        }
+    elif method == 'vd':
+        ray_config = {
+            "policy_lr": tune.loguniform(1e-5, 1e-3),
+            "value_lr": tune.loguniform(1e-5, 1e-3),
+            "policy_weight_decay": tune.choice([0, 0.1]),
+            "value_weight_decay": tune.choice([0, 0.1]),
+            "train_batch_size": tune.choice([16,32,64]),
+            "deepsets_phi_hidden_n": tune.randint(1,5),
+            "deepsets_phi_hidden_dim": tune.lograndint(8,65),
+            "deepsets_latent_dim": tune.lograndint(8,129),
+            "deepsets_rho_hidden_n": tune.randint(0,3),
+            "deepsets_rho_hidden_dim": tune.lograndint(8,129),
+            "deepsets_output_dim": tune.lograndint(4,129),
+            "head_hidden_n": tune.randint(1,6),
+            "head_hidden_dim": tune.lograndint(16,257),
+            "head_final_activation": tune.choice(['sigmoid', None]),
+            "clip_grad_norm": tune.choice([.5, 1., 5., 10.]),
+            "discount": tune.choice([.95, .99])
         }
     else:
         raise NotImplementedError
