@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.nn.utils import clip_grad_norm_
 import pickle
 import itertools
 from torch.utils.tensorboard import SummaryWriter
@@ -164,6 +165,7 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
     train_epochs = config['train_epochs']
     train_batch_size = config['train_batch_size']
     discount = config['discount']
+    clip_grad_norm = config['clip_grad_norm']
 
     cv_every = 1
     print_epoch_every = 1000
@@ -236,16 +238,19 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
 
             loss = f_value_dice_loss(batch)
 
-            # TODO: Regularization is done in original source code
             policy_loss = -loss #+ ORTHOGONAL_REGULARIZER
             value_loss = loss #+ GRADIENT_REGULARIZER
 
             # compute loss and step optimizer
             policy_optimizer.zero_grad()
-            policy_loss.backward(retain_graph=True)
-            policy_optimizer.step()
             value_optimizer.zero_grad()
+            policy_loss.backward(retain_graph=True)
             value_loss.backward()
+
+            clip_grad_norm_(policy.policy.parameters(), clip_grad_norm)
+            clip_grad_norm_(policy.value.parameters(), clip_grad_norm)
+
+            policy_optimizer.step()
             value_optimizer.step()
 
             epoch_loss += loss.item() / len(train_dataset)
