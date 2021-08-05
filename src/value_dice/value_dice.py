@@ -94,8 +94,8 @@ class ValueDicePolicy(IntersimPolicy):
             transforms (dict): dictionary of transforms to apply to different fields
         """
         super(ValueDicePolicy, self).__init__(config, transforms)
-        self._policy = IntersimStateNet(config["policy_net"])
-        self._value = IntersimStateActionNet(config["value_net"])
+        self._policy = IntersimStateNet(config['policy_net'])
+        self._value = IntersimStateActionNet(config['value_net'])
         
     @property 
     def value(self):
@@ -204,9 +204,9 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
         next_state = policy.transform_observation(next_state)
 
         # evaluate value network
-        value = (policy.value(state))
-        value_init = (policy.value(initial_state))
-        value_next = (policy.value(next_state))
+        value = policy.value(state)
+        value_init = policy.value(initial_state)
+        value_next = policy.value(next_state)
         
         # linear loss
         linear_loss = (1 - discount) * torch.mean(value_init)
@@ -238,8 +238,10 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
 
             loss = f_value_dice_loss(batch)
 
-            policy_loss = -loss #+ ORTHOGONAL_REGULARIZER
-            value_loss = loss #+ GRADIENT_REGULARIZER
+            # In original implementation policy is regularized with orthogonal regularization, 
+            # value with L2 regularization on gradients
+            policy_loss = -loss
+            value_loss = loss
 
             # compute loss and step optimizer
             policy_optimizer.zero_grad()
