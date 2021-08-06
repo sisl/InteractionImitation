@@ -65,7 +65,7 @@
             hidden_n: 3,
             hidden_dim: 50,
             output_dim: 1, // number of outputs e.g. number of actions, or just one
-            final_activation: 'sigmoid',
+            final_activation: 'id',
         },
     },
     policy_optim: {

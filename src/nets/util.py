@@ -1,5 +1,5 @@
 import torch
-from torch.nn import functional
+from torch.nn import functional, Identity
 
 def parse_functional(functional_config):
     if isinstance(functional_config, str):
@@ -9,4 +9,6 @@ def parse_functional(functional_config):
             return torch.sigmoid
         elif functional_config == 'softmax':
             return functional.softmax
+        elif functional_config == 'id':
+            return Identity()
     return None
