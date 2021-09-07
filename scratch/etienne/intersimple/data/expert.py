@@ -74,7 +74,17 @@ class DummyVecEnvPolicy():
         states = [p[1] for p in predictions]
         return actions, states
 
-def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedRandomAgent', path=None, min_timesteps=25000, min_episodes=None, env_args={}, policy_args={}):
+def save_video(env, expert):
+    env.reset()
+    env.render()
+    done = False
+    while not done:
+        actions, _ = expert.predict()
+        _, _, done, _ = env.step(actions)
+        env.render()
+    env.close()
+
+def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedRandomAgent', path=None, min_timesteps=25000, min_episodes=None, video=False, env_args={}, policy_args={}):
     """Rollout and save expert demos.
     
     Usage:
@@ -90,6 +100,9 @@ def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedRandomA
 
     policy = Expert(env, **policy_args)
     venv_policy = DummyVecEnvPolicy([lambda: policy])
+
+    if video:
+        save_video(env, policy)
     
     path = path or (policy.__class__.__name__ + '_' + env.__class__.__name__ + '.pkl')
 
