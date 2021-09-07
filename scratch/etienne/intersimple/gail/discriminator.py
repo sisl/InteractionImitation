@@ -5,7 +5,6 @@ class CnnDiscriminator(torch.nn.Module):
 
     def __init__(self, env):
         super().__init__()
-        print('venv obs', env.observation_space.shape)
 
         obs_channels, _, _ = env.observation_space.shape
         (action_size,) = env.action_space.shape
