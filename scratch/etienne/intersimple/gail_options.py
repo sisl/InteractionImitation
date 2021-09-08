@@ -7,6 +7,9 @@ from intersim.envs.intersimple import Intersimple
 import itertools
 from torch.distributions import Categorical
 import gym
+import torch
+
+ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20, 50, 100]]
 
 class OptionsMlpPolicy:
 
@@ -36,15 +39,32 @@ class OptionsMlpPolicy:
 
 def available_actions(env):
     """Return mask of available actions given current `env` state."""
-    return np.ones((env.num_hl_actions,))
+    valid = np.array([feasible(env, generate_plan(env, i)) for i in range(len(ALL_OPTIONS))])
+    return valid
+
+def target_velocity_plan(current_v: float, target_v: float, t: int)
+    """Smoothly target a velocity in a given number of steps"""
+    # for now, constant acceleration
+    a = (target_v - current_v)  / t
+    return a*np.ones((t,))
 
 def generate_plan(env, i):
     """Generate input profile for high-level action `i`."""
-    return np.zeros((env.num_hl_steps,))
+    assert i < len(ALL_OPTIONS), "Invalid option index {i}"
+    target_v, t = ALL_OPTSIONS[i]
+    current_v = env._env.state[env._agent, 1].item() # extract from env
+    plan = target_velocity_plan(current_v, target_v, t)
+    assert len(plan) == t, "incorrect plan length"
+    return plan
 
 def feasible(env, plan):
     """Check if input profile is feasible given current `env` state."""
-    return True
+    
+    # zero pad plan - Take (T,) np plan and convert it to (T, nv, 1) torch.Tensor
+    full_plan = torch.zeros(len(plan), env._env._nv, 1)
+    full_plan[:, env._agent, 0] = torch.tensor(plan)
+    valid = env._env.check_future_collisions([full_plan]) # check_future_collisions takes in B-list and outputs (B,) bool tensor
+    return valid.item()
 
 def sample_ll(env, generator):
     """Sample low-level (state, action) pairs for discriminator training."""
