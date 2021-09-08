@@ -10,7 +10,7 @@ from imitation.algorithms import adversarial, bc
 from imitation.data import rollout
 from imitation.util import logger
 
-from intersim.envs.intersimple import NRasterized
+from intersimple.intersimple import NRasterized
 
 from gail.discriminator import CnnDiscriminator
 
@@ -18,7 +18,7 @@ model_name = 'gail_image'
 
 # %%
 # Load pickled test demonstrations.
-with open("data/NormalizedIntersimpleExpert_NRasterizedAgent51.pkl", "rb") as f:
+with open("data/NormalizedIntersimpleExpertMu.001_NRasterizedAgent51w36h36mppx2.pkl", "rb") as f:
     # This is a list of `imitation.data.types.Trajectory`, where
     # every instance contains observations and actions for a single expert
     # demonstration.
@@ -30,7 +30,7 @@ with open("data/NormalizedIntersimpleExpert_NRasterizedAgent51.pkl", "rb") as f:
 # (observation, actions, next_observation) transitions.
 transitions = rollout.flatten_trajectories(trajectories)
 
-venv = make_vec_env(NRasterized, n_envs=2, env_kwargs={'agent': 51})
+venv = make_vec_env(NRasterized, n_envs=2, env_kwargs={'agent': 51, 'width': 36, 'height': 36, 'm_per_px': 2})
 
 tempdir = tempfile.TemporaryDirectory(prefix="quickstart")
 tempdir_path = pathlib.Path(tempdir.name)
@@ -43,10 +43,10 @@ logger.configure(tempdir_path / "GAIL/")
 gail_trainer = adversarial.GAIL(
     venv,
     expert_data=transitions,
-    expert_batch_size=200,
-    n_disc_updates_per_round=2048,
+    expert_batch_size=32,
+    #n_disc_updates_per_round=2048,
     discrim_kwargs={'discrim_net': CnnDiscriminator(venv)},
-    gen_algo=sb3.PPO("CnnPolicy", venv, verbose=1, n_steps=128),
+    gen_algo=sb3.PPO("CnnPolicy", venv, verbose=1, n_steps=1024),
 )
 gail_trainer.train(total_timesteps=100000)
 gail_trainer.gen_algo.save(model_name)
@@ -56,7 +56,7 @@ gail_trainer.gen_algo.save(model_name)
 # %%
 model = sb3.PPO.load(model_name)
 
-env = NRasterized(agent=51)
+env = NRasterized(agent=51, width=36, height=36, m_per_px=2)
 
 obs = env.reset()
 while True:

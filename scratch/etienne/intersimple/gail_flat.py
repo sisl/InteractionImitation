@@ -43,12 +43,12 @@ logger.configure(tempdir_path / "GAIL/")
 gail_trainer = adversarial.GAIL(
     venv,
     expert_data=transitions,
-    expert_batch_size=220,
-    #n_disc_updates_per_round=32,
+    expert_batch_size=150,
+    n_disc_updates_per_round=32,
     discrim_kwargs={'discrim_net': MlpDiscriminator()},
-    gen_algo=sb3.PPO("MlpPolicy", venv, verbose=1, n_steps=4096),
+    gen_algo=sb3.PPO("MlpPolicy", venv, verbose=1, n_steps=4530),
 )
-gail_trainer.train(total_timesteps=80000)
+gail_trainer.train(total_timesteps=400000)
 gail_trainer.gen_algo.save(model_name)
 
 #del gail_trainer
