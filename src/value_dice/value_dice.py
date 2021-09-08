@@ -215,9 +215,16 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
 
         # nonlinear loss
         value_diff = value - discount * value_next
-        nonlinear_loss = torch.logsumexp(value_diff, dim=0) - np.log(len(value_diff))
+        # print(value_diff)
+        # nonlinear_loss = torch.logsumexp(value_diff, dim=0) #- np.log(len(value_diff))
+        nonlinear_loss = torch.log(torch.mean(torch.exp(value_diff), dim=0))
 
         loss = nonlinear_loss - linear_loss
+        print("Loss report:")
+        print("Linear: {}".format(linear_loss.item()))
+        print("Nonlinear: {}".format(nonlinear_loss.item()))
+        print("Total: {}".format(loss.item()))
+
         return loss
 
 
@@ -237,7 +244,6 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
         # train
         epoch_loss = 0
         for (batch_idx, batch) in enumerate(training_loader):
-
             loss = f_value_dice_loss(batch)
 
             # In original implementation policy is regularized with orthogonal regularization, 
@@ -260,12 +266,22 @@ def train(config, policy, train_dataset, cv_dataset, filestr, **kwargs):
             if batch_idx % 2 == 0:
                 policy_optimizer.zero_grad()
                 policy_loss.backward()
-                clip_grad_norm_(policy.policy.parameters(), clip_grad_norm)
+                # clip_grad_norm_(policy.policy.parameters(), clip_grad_norm)
                 policy_optimizer.step()
+
+                grad_list = torch.cat([torch.flatten(p.grad) for p in policy.policy.parameters()])
+                torch.mean(grad_list)
+                print("gradient stats:")
+                print(torch.mean(grad_list))
+                print(torch.std(grad_list))
+                print(torch.min(grad_list))
+                print(torch.max(grad_list))
+                # print(policy.policy.head.layers[0].weight.grad)
+                # print(policy.policy.head.layers[0].bias.grad)
             else:
                 value_optimizer.zero_grad()
                 value_loss.backward()
-                clip_grad_norm_(policy.value.parameters(), clip_grad_norm)
+                # clip_grad_norm_(policy.value.parameters(), clip_grad_norm)
                 value_optimizer.step()
 
             epoch_loss += loss.item() / len(train_dataset)
