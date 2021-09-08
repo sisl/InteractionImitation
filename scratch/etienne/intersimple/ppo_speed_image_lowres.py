@@ -1,6 +1,6 @@
 # %%
 from stable_baselines3 import PPO
-from intersimple.intersimple import NRasterized, speed_reward
+from intersim.envs.intersimple import NRasterized, speed_reward
 import functools
 
 model_name = "ppo_speed_image_lowres"

@@ -10,7 +10,7 @@ from imitation.algorithms import adversarial, bc
 from imitation.data import rollout
 from imitation.util import logger
 
-from intersimple.intersimple import NRasterized
+from intersim.envs.intersimple import NRasterized
 
 from gail.discriminator import CnnDiscriminator
 
