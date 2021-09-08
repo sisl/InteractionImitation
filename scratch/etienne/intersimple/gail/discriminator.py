@@ -1,5 +1,8 @@
 import torch
 
+# imitation.rewards.discrim_nets.DiscrimNetGAIL is composed of self.discriminator (nn.Module),
+# which gets called with inputs (state, action) when needed.
+
 class CnnDiscriminator(torch.nn.Module):
     """ConvNet similar to stable_baselines3.common.policies.ActorCriticCnnPolicy."""
 
@@ -23,11 +26,16 @@ class CnnDiscriminator(torch.nn.Module):
             torch.nn.LazyLinear(1), # 512 -> 1
         )
     
-    def forward(self, state, action):
+    @staticmethod
+    def _concatenate(state, action):
         b, _, h, w = state.shape
         _, a = action.shape
-        act_layer = action.unsqueeze(-1).unsqueeze(-1).expand((b, a, h, w))
-        sa = torch.cat((act_layer, state), -3)
+        act = action.unsqueeze(-1).unsqueeze(-1).expand((b, a, h, w))
+        sa = torch.cat((state, act), -3)
+        return sa
+
+    def forward(self, state, action):
+        sa = self._concatenate(state, action)
         return self.cnn(sa).squeeze()
 
 class MlpDiscriminator(torch.nn.Module):
