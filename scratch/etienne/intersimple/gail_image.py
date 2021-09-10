@@ -47,6 +47,7 @@ gail_trainer = adversarial.GAIL(
     #n_disc_updates_per_round=2048,
     discrim_kwargs={'discrim_net': CnnDiscriminator(venv)},
     gen_algo=sb3.PPO("CnnPolicy", venv, verbose=1, n_steps=1024),
+    allow_variable_horizon=True,
 )
 gail_trainer.train(total_timesteps=100000)
 gail_trainer.gen_algo.save(model_name)
