@@ -47,11 +47,12 @@ def target_velocity_plan(current_v: float, target_v: float, t: int)
     # for now, constant acceleration
     a = (target_v - current_v)  / t
     return a*np.ones((t,))
+Hello
 
 def generate_plan(env, i):
     """Generate input profile for high-level action `i`."""
     assert i < len(ALL_OPTIONS), "Invalid option index {i}"
-    target_v, t = ALL_OPTSIONS[i]
+    target_v, t = ALL_OPTIONS[i]
     current_v = env._env.state[env._agent, 1].item() # extract from env
     plan = target_velocity_plan(current_v, target_v, t)
     assert len(plan) == t, "incorrect plan length"
