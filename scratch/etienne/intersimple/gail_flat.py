@@ -47,6 +47,7 @@ gail_trainer = adversarial.GAIL(
     n_disc_updates_per_round=32,
     discrim_kwargs={'discrim_net': MlpDiscriminator()},
     gen_algo=sb3.PPO("MlpPolicy", venv, verbose=1, n_steps=4530),
+    allow_variable_horizon=True,
 )
 gail_trainer.train(total_timesteps=400000)
 gail_trainer.gen_algo.save(model_name)
