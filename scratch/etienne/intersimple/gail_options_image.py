@@ -19,7 +19,7 @@ from stable_baselines3.common.env_util import make_vec_env
 model_name = 'gail_options_image'
 env_settings = {'agent': 51, 'width': 36, 'height': 36, 'm_per_px': 2}
 
-ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]]
+ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is safe fallback
 
 class OptionsCnnPolicy(stable_baselines3.common.policies.ActorCriticCnnPolicy):
 
@@ -47,7 +47,7 @@ class OptionsCnnPolicy(stable_baselines3.common.policies.ActorCriticCnnPolicy):
 
 def available_actions(env):
     """Return mask of available actions given current `env` state."""
-    valid = np.array([feasible(env, generate_plan(env, i)) for i in range(len(ALL_OPTIONS))])
+    valid = np.array([feasible(env, generate_plan(env, i), i) for i in range(len(ALL_OPTIONS))])
     return valid
 
 def target_velocity_plan(current_v: float, target_v: float, t: int, dt: float):
@@ -65,14 +65,43 @@ def generate_plan(env, i):
     assert len(plan) == t, "incorrect plan length"
     return plan
 
-def feasible(env, plan):
-    """Check if input profile is feasible given current `env` state."""
+def check_future_collisions_fast(env, actions):
+    """Checks whether `env._agent` would collide with other agents assuming `actions` as input.
+    
+    Vehicles are (over-)approximated by single circles.
+
+    Args:
+        env (gym.Env): current environment state
+        actions (list of torch.Tensor): list of B (T, nv, adims) T-length action profiles
+    Returns:
+        feasible (torch.Tensor): tensor of shape (B,) indicating whether the respective action profiles are collision-free
+    """
+    B, (T, nv, _) = len(actions), actions[0].shape
+
+    states = torch.stack(env._env.propagate_action_profile(actions), axis=0)
+    assert states.shape == (B, T, nv, 5)
+
+    distance = ((states[:, :, :, :2] - states[:, :, env._agent:env._agent+1, :2])**2).sum(-1).sqrt()
+    distance = torch.where(distance.isnan(), np.inf*torch.ones_like(distance), distance) # only collide with spawned agents
+    distance[:, :, env._agent] = np.inf # cannot collide with itself
+    assert distance.shape == (B, T, nv)
+
+    radius = (env._env._lengths**2 + env._env._widths**2).sqrt() / 2
+    min_distance = radius[env._agent] + radius
+    min_distance = min_distance.unsqueeze(0).unsqueeze(0)
+    print('min_distance', min_distance.shape)
+    assert min_distance.shape == (1, 1, nv)
+
+    return (distance > min_distance).all(-1).all(-1)
+
+def feasible(env, plan, ch):
+    """Check if input profile is feasible given current `env` state. Action `ch=0` is safe fallback."""
     
     # zero pad plan - Take (T,) np plan and convert it to (T, nv, 1) torch.Tensor
     full_plan = torch.zeros(len(plan), env._env._nv, 1)
     full_plan[:, env._agent, 0] = torch.tensor(plan)
-    valid = env._env.check_future_collisions([full_plan]) # check_future_collisions takes in B-list and outputs (B,) bool tensor
-    return valid.item()
+    valid = check_future_collisions_fast(env, [full_plan]) # check_future_collisions_fast takes in B-list and outputs (B,) bool tensor
+    return ch == 0 or valid.item()
 
 def sample_ll(env, generator):
     """Sample low-level (state, action) pairs for discriminator training."""
@@ -89,7 +118,11 @@ def sample_ll(env, generator):
         })
         plan = list(map(float, generate_plan(env, ch)))
 
-        while not done and plan and feasible(env, plan):
+        assert not done
+        assert plan
+        assert feasible(env, plan, ch), f'Infeasible hl action {ch}'
+
+        while not done and plan and feasible(env, plan, ch):
             a, plan = env._normalize(plan[0]), plan[1:]
             nexts, _, done, _ = env.step(a)
             yield {
@@ -120,7 +153,7 @@ def sample_hl(env, generator, discriminator):
         r = 0
         steps = 0
 
-        while not done and plan and feasible(env, plan):
+        while not done and plan and feasible(env, plan, ch):
             a, plan = env._normalize(plan[0]), plan[1:]
             r += discriminator.discrim_net.discriminator(
                 torch.tensor(s).unsqueeze(0).to(discriminator.discrim_net.device()),
@@ -228,7 +261,7 @@ if __name__ == '__main__':
     with open("data/NormalizedIntersimpleExpertMu.001_NRasterizedAgent51w36h36mppx2.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
-    generator = train(transitions, epochs=2, expert_batch_size=2, generator_steps=2)
+    generator = train(transitions, generator_steps=200)
 
     generator.save(model_name)
 
@@ -248,7 +281,7 @@ if __name__ == '__main__':
         })
         plan = list(map(float, generate_plan(env, ch)))
 
-        while not done and plan and feasible(env, plan):
+        while not done and plan and feasible(env, plan, ch):
             a, plan = env._normalize(plan[0]), plan[1:]
             s, _, done, _ = env.step(a)
             env.render()
