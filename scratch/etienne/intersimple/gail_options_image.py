@@ -154,7 +154,7 @@ def sample(env, generator, discriminator, level: str):
             assert steps > 0
             yield {
                 'obs': obs,
-                'action': ch,
+                'option': ch,
                 'reward': r.detach() / steps,
                 'episode_start': episode_start,
                 'value': value.detach(),
@@ -182,7 +182,7 @@ def train_generator(env, generator, discriminator, num_samples):
     for s in generator_samples[:-1]:
         generator.rollout_buffer.add(
             obs=s['obs'],
-            action=s['action'].cpu(),
+            action=s['option'].cpu(),
             reward=s['reward'].cpu(),
             episode_start=s['episode_start'],
             value=s['value'],
