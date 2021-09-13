@@ -128,15 +128,15 @@ def sample(env, generator, discriminator, level: str):
         assert feasible(env, plan, ch), f'Infeasible hl action {ch}'
 
         r = 0
-        steps = 0
+        discount = 1
         while not done and plan and feasible(env, plan, ch):
             a, plan = env._normalize(plan[0]), plan[1:]
             if level == 'high':
-                r += discriminator.discrim_net.discriminator(
+                r += discount * discriminator.discrim_net.discriminator(
                     torch.tensor(s).unsqueeze(0).to(discriminator.discrim_net.device()),
                     torch.tensor([[a]]).to(discriminator.discrim_net.device()),
                 )
-                steps += 1
+                discount *= env.discount
 
             nexts, _, done, _ = env.step(a)
             m = available_actions(env)
@@ -151,11 +151,10 @@ def sample(env, generator, discriminator, level: str):
             s = nexts
 
         if level == 'high':
-            assert steps > 0
             yield {
                 'obs': obs,
                 'option': ch,
-                'reward': r.detach() / steps,
+                'reward': r.detach(),
                 'episode_start': episode_start,
                 'value': value.detach(),
                 'log_prob': log_prob.detach(),
@@ -207,8 +206,9 @@ class OptionsEnv(gym.Wrapper):
             'mask': gym.spaces.Box(low=0, high=1, shape=(num_hl_options,)),
         })
 
-def train(expert_data, epochs=10, expert_batch_size=32, generator_steps=2048):
+def train(expert_data, epochs=10, expert_batch_size=32, generator_steps=2048, discount=0.99):
     env = NRasterized(**env_settings)
+    env.discount = discount
 
     tempdir = tempfile.TemporaryDirectory(prefix="quickstart")
     tempdir_path = pathlib.Path(tempdir.name)
