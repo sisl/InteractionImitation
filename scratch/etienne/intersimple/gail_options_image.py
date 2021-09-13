@@ -259,8 +259,10 @@ if __name__ == '__main__':
 
     env = NRasterized(**env_settings)
 
-    for _ in sample(env, generator, None, 'low'):
+    for transition in sample(env, generator, None, 'low'):
         env.render()
+        if transition['dones']:
+            break
 
     env.close(filestr='render/'+model_name)
 
