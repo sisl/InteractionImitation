@@ -65,7 +65,7 @@ class OptionsEnv(gym.Wrapper):
     def _transitions(self):
         raise NotImplementedError('Use `LLOptions` or `HLOptions` for sampling.')
     
-    def sample(self, policy):
+    def sample(self, generator):
         self.done = True
         while True:
             self.episode_start = False
@@ -75,9 +75,9 @@ class OptionsEnv(gym.Wrapper):
                 self.done = False
                 self.episode_start = True
 
-            self.ch, self.value, self.log_prob = policy.predict({
-                'obs': torch.tensor(self.s).unsqueeze(0).to(policy.device),
-                'mask': torch.tensor(self.m).unsqueeze(0).to(policy.device),
+            self.ch, self.value, self.log_prob = generator.policy.predict({
+                'obs': torch.tensor(self.s).unsqueeze(0).to(generator.policy.device),
+                'mask': torch.tensor(self.m).unsqueeze(0).to(generator.policy.device),
             })
             self.plan = list(map(float, generate_plan(self.env, self.ch)))
 
@@ -106,7 +106,10 @@ class LLOptions(OptionsEnv):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.observation_space = self.observation_space['obs']
-    
+
+    def _after_choice(self):
+        self._transition_buffer = []
+
     def _after_step(self):
         self._transition_buffer.append({
             'obs': self.s,
@@ -119,7 +122,6 @@ class LLOptions(OptionsEnv):
         yield from self._transition_buffer
     
     def sample_ll(self, policy):
-        self._transition_buffer = []
         return self.sample(policy)
 
 class HLOptions(OptionsEnv):
@@ -133,9 +135,9 @@ class HLOptions(OptionsEnv):
         self.steps = 0
 
     def _after_step(self):
-        self.r += self.discount**self.steps * self.discriminator(
-            torch.tensor(self.s).unsqueeze(0).to(self.discriminator.device()),
-            torch.tensor([[self.a]]).to(self.discriminator.device()),
+        self.r += self.discount**self.steps * self.discriminator.discrim_net.discriminator(
+            torch.tensor(self.s).unsqueeze(0).to(self.discriminator.discrim_net.device()),
+            torch.tensor([[self.a]]).to(self.discriminator.discrim_net.device()),
         )
         self.steps += 1
     
@@ -153,6 +155,15 @@ class HLOptions(OptionsEnv):
     def sample_hl(self, policy, discriminator):
         self.discriminator = discriminator
         return self.sample(policy)
+
+class RenderOptions(LLOptions):
+
+    def _after_step(self):
+        super()._after_step()
+        self.env.render()
+    
+    def close(self, *args, **kwargs):
+        self.env.close(*args, **kwargs)
 
 def available_actions(env):
     """Return mask of available actions given current `env` state."""
@@ -220,12 +231,12 @@ def flatten_transitions(transitions):
     }
 
 def train_discriminator(env, generator, discriminator, num_samples):
-    transitions = list(itertools.islice(env.sample_ll(generator.policy), num_samples))
+    transitions = list(itertools.islice(env.sample_ll(generator), num_samples))
     generator_samples = flatten_transitions(transitions)
     discriminator.train_disc(gen_samples=generator_samples)
 
 def train_generator(env, generator, discriminator, num_samples):
-    generator_samples = list(itertools.islice(env.sample_hl(generator.policy, discriminator.discrim_net.discriminator), num_samples+1))
+    generator_samples = list(itertools.islice(env.sample_hl(generator, discriminator), num_samples+1))
     
     generator.rollout_buffer.reset()
     for s in generator_samples[:-1]:
@@ -289,25 +300,24 @@ if __name__ == '__main__':
     with open("data/NormalizedIntersimpleExpertMu.001_NRasterizedAgent51w36h36mppx2.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
-    generator = train(transitions, generator_steps=200)
+    generator = train(transitions, epochs=2, expert_batch_size=2, generator_steps=2)
 
     generator.save(model_name)
 
     # %%
     model = stable_baselines3.PPO.load(model_name)
 
-    env = LLOptions(NRasterized(**env_settings))
+    env = RenderOptions(NRasterized(**env_settings))
 
-    for s in env.sample_ll(env, generator.policy):
-        env.env.render()
+    for s in env.sample_ll(generator):
         if s['dones']:
             break
 
-    env.env.close(filestr='render/'+model_name)
+    env.close(filestr='render/'+model_name)
 
 # %% Tests
 
-def test_ll_transitions_vs_expert_data():
+def test_ll_expert_data():
     with open("data/NormalizedIntersimpleExpertMu.001_NRasterizedAgent51w36h36mppx2.pkl", "rb") as f:
         expert_trajectories = pickle.load(f)
     expert_transitions = rollout.flatten_trajectories(expert_trajectories)
@@ -319,7 +329,7 @@ def test_ll_transitions_vs_expert_data():
             OptionsCnnPolicy,
             OptionsEnv(env),
             verbose=1,
-        ).policy
+        )
     ), 10))
     gen_transitions = flatten_transitions(gen_transitions)
 
@@ -328,6 +338,31 @@ def test_ll_transitions_vs_expert_data():
     assert expert_transitions[:10].acts.shape == gen_transitions['acts'].shape
     assert expert_transitions[:10].dones.shape == gen_transitions['dones'].shape
 
+def test_ll_states():
+    env = NRasterized()
+    policy = stable_baselines3.PPO(
+        OptionsCnnPolicy,
+        OptionsEnv(env),
+        verbose=1,
+    )
+    llenv = LLOptions(env)
+    transitions = list(itertools.islice(llenv.sample_ll(policy=policy), 100))
+
+    env2 = NRasterized()
+    s2 = env2.reset()
+    for i, t in enumerate(transitions):
+        assert i == 0 or np.array_equal(t['obs'], transitions[i-1]['next_obs'])
+        assert np.array_equal(t['obs'], s2)
+        assert t['acts'].shape == (1,)
+
+        nexts2, _, done2, _ = env2.step(t['acts'])
+        assert np.array_equal(t['next_obs'], nexts2)
+        assert np.array_equal(t['dones'], done2)
+
+        if done2:
+            break
+
+        s2 = nexts2
 
 def test_hl_transitions():
     pass
