@@ -63,10 +63,16 @@ class NormalizedIntersimpleExpert(IntersimpleExpert):
         action, _ = super().predict(*args, **kwargs)
         return self._intersimple._normalize(action), None
 
-class DummyVecEnvPolicy():
+class DummyVecEnvPolicy(BasePolicy):
 
     def __init__(self, experts):
         self._experts = [e() for e in experts]
+
+    def forward(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def _predict(self, *args, **kwargs):
+        raise NotImplementedError()
     
     def predict(self, *args, **kwargs):
         predictions = [e.predict() for e in self._experts]
