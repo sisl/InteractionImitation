@@ -36,7 +36,8 @@ class CnnDiscriminator(torch.nn.Module):
 
     def forward(self, state, action):
         sa = self._concatenate(state, action)
-        return self.cnn(sa).squeeze()
+        assert sa.ndim == 4
+        return self.cnn(sa).squeeze(1)
 
 class MlpDiscriminator(torch.nn.Module):
     """MLP similar to stable_baselines3.common.policies.ActorCriticPolicy."""
@@ -55,4 +56,5 @@ class MlpDiscriminator(torch.nn.Module):
     def forward(self, state, action):
         flat = self.flatten(state)
         sa = torch.cat((action, flat), -1)
-        return self.mlp(sa).squeeze()
+        assert sa.ndim == 2
+        return self.mlp(sa).squeeze(1)
