@@ -1,6 +1,7 @@
 *.pkl
 *.pt
 *.zip
+**/ray*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -149,3 +150,4 @@ output/
 
 # Dependencies
 InteractionSimulator/
+imitation/
