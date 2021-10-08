@@ -48,7 +48,7 @@ class OptionsCnnPolicy(stable_baselines3.common.policies.ActorCriticCnnPolicy):
 class OptionsEnv(gym.Wrapper):
     
     def __init__(self, env, *args, **kwargs):
-        super().__init__(env, *args, *kwargs)
+        super().__init__(env, *args, **kwargs)
         num_hl_options = len(ALL_OPTIONS)
         self.action_space = gym.spaces.Discrete(num_hl_options)
         self.observation_space = gym.spaces.Dict({
