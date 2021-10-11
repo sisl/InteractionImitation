@@ -39,6 +39,47 @@ class CnnDiscriminator(torch.nn.Module):
         assert sa.ndim == 4
         return self.cnn(sa).squeeze(1)
 
+class CnnDiscriminatorFlatAction(torch.nn.Module):
+    """ConvNet similar to stable_baselines3.common.policies.ActorCriticCnnPolicy."""
+
+    def __init__(self, env):
+        super().__init__()
+
+        obs_channels, _, _ = env.observation_space.shape
+        (action_size,) = env.action_space.shape
+        in_channels = obs_channels
+
+        self.cnn = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels, 32, kernel_size=(8, 8), stride=(4, 4)), # in_channels -> 32
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 64, kernel_size=(4, 4), stride=(2, 2)), # 32 -> 64
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1)), # 64 -> 64
+            torch.nn.ReLU(),
+            torch.nn.Flatten(start_dim=1, end_dim=-1),
+            torch.nn.LazyLinear(128), # 28224 -> 128
+        )
+        self.decoder = torch.nn.Sequential(
+            torch.nn.LazyLinear(64), #128 + 2 -> 64
+            torch.nn.ReLU(),
+            torch.nn.LazyLinear(64), #64 -> 64
+            torch.nn.ReLU(),
+            torch.nn.LazyLinear(1) #64 -> 1
+        )
+    
+    @staticmethod
+    def _concatenate(state, action):
+        b, s= state.shape
+        b, a = action.shape
+        sa = torch.cat((state, action), -1)
+        return sa
+
+    def forward(self, state, action):
+        s = self.cnn(state)
+        sa = self._concatenate(s, action)
+        assert sa.ndim == 2
+        return self.decoder(sa).squeeze(1)
+
 class MlpDiscriminator(torch.nn.Module):
     """MLP similar to stable_baselines3.common.policies.ActorCriticPolicy."""
 
