@@ -1,5 +1,5 @@
 # %%
-from gail.discriminator import CnnDiscriminator
+from gail.discriminator import CnnDiscriminator, CnnDiscriminatorFlatAction
 from imitation.algorithms import adversarial
 import stable_baselines3
 import torch.utils.data
@@ -271,7 +271,8 @@ def train(expert_data, epochs=10, expert_batch_size=32, generator_steps=2048, di
     discriminator = adversarial.GAIL(
         expert_data=expert_data,
         expert_batch_size=expert_batch_size,
-        discrim_kwargs={'discrim_net': CnnDiscriminator(venv)},
+        discrim_kwargs={'discrim_net': CnnDiscriminatorFlatAction(venv)},
+        #discrim_kwargs={'discrim_net': CnnDiscriminator(venv)},
         venv=venv, # unused
         gen_algo=stable_baselines3.PPO("CnnPolicy", venv), # unused
     )
@@ -299,10 +300,11 @@ def train(expert_data, epochs=10, expert_batch_size=32, generator_steps=2048, di
 # %%
 if __name__ == '__main__':
     # %%
+ 
     with open("data/NormalizedIntersimpleExpertMu.001_NRasterizedAgent51w36h36mppx2.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
-    generator = train(transitions, epochs=2, expert_batch_size=2, generator_steps=2)
+    generator = train(transitions)
 
     generator.save(model_name)
 

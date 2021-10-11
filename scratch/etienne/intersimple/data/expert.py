@@ -79,6 +79,12 @@ class DummyVecEnvPolicy(BasePolicy):
         actions = [p[0] for p in predictions]
         states = [p[1] for p in predictions]
         return actions, states
+    
+    def forward(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def _predict(self, *args, **kwargs):
+        raise NotImplementedError()
 
 def save_video(env, expert):
     env.reset()

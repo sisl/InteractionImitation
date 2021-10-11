@@ -75,7 +75,7 @@ class CnnDiscriminatorFlatAction(torch.nn.Module):
         return sa
 
     def forward(self, state, action):
-        s = self.cnn(state)
+        s = self.cnn(state.float())
         sa = self._concatenate(s, action)
         assert sa.ndim == 2
         return self.decoder(sa).squeeze(1)
