@@ -303,6 +303,8 @@ if __name__ == '__main__':
  
     with open("data/NormalizedIntersimpleExpertMu.001_NRasterizedAgent51w36h36mppx2.pkl", "rb") as f:
         trajectories = pickle.load(f)
+    import pdb 
+    pdb.set_trace()
     transitions = rollout.flatten_trajectories(trajectories)
     generator = train(transitions)
 

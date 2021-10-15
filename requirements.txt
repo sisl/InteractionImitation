@@ -4,6 +4,7 @@ sklearn
 pytest
 json5
 tqdm
-tensorboard
 ray[tune]
 hyperopt
+psutil
+fire
