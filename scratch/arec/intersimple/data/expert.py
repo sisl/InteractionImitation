@@ -111,9 +111,7 @@ def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedIncreme
         env_args (dict): dictionary of kwargs when instantiating environment class
         policy_args (dict): dictionary of kwargs when instantiating Expert policy
     """
-    import pdb
-    pdb.set_trace()
-
+    
     Env = intersim.envs.intersimple.__dict__[env]
     Expert = globals()[expert]
 
