@@ -217,7 +217,8 @@ def check_future_collisions_fast(env, actions):
 
 def feasible(env, plan, ch):
     """Check if input profile is feasible given current `env` state. Action `ch=0` is safe fallback."""
-    
+    return True
+
     # zero pad plan - Take (T,) np plan and convert it to (T, nv, 1) torch.Tensor
     full_plan = torch.zeros(len(plan), env._env._nv, 1)
     full_plan[:, env._agent, 0] = torch.tensor(plan)
@@ -258,7 +259,7 @@ def train_generator(env, generator, discriminator, num_samples):
     
     generator.train()
 
-def train(expert_data, epochs=10, expert_batch_size=32, generator_steps=2048, discount=0.99):
+def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=1024, discount=0.99):
     env = NRasterized(**env_settings)
     env.discount = discount
 
@@ -303,8 +304,6 @@ if __name__ == '__main__':
  
     with open("data/NormalizedIntersimpleExpertMu.001_NRasterizedAgent51w36h36mppx2.pkl", "rb") as f:
         trajectories = pickle.load(f)
-    import pdb 
-    pdb.set_trace()
     transitions = rollout.flatten_trajectories(trajectories)
     generator = train(transitions)
 
@@ -315,7 +314,7 @@ if __name__ == '__main__':
 
     env = RenderOptions(NRasterized(**env_settings))
 
-    for s in env.sample_ll(generator):
+    for s in env.sample_ll(model):
         if s['dones']:
             break
 
