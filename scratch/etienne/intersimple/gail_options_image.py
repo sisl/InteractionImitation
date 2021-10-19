@@ -15,6 +15,7 @@ import tempfile
 import pathlib
 from imitation.util import logger
 from stable_baselines3.common.env_util import make_vec_env
+from tqdm import tqdm
 
 model_name = 'gail_options_image'
 env_settings = {'agent': 51, 'width': 36, 'height': 36, 'm_per_px': 2}
@@ -32,17 +33,17 @@ class OptionsCnnPolicy(stable_baselines3.common.policies.ActorCriticCnnPolicy):
         values = self.value_net(latent_vf)
         return values, distribution.distribution
 
-    def predict(self, obs):
+    def predict(self, obs, eps=1e-6):
         s, m = obs['obs'], obs['mask']
         values, prior = self._prior_distribution(s)
-        posterior = Categorical(prior.probs * m)
+        posterior = Categorical((prior.probs + eps) * m)
         ch = posterior.sample()
         return ch, values, posterior.log_prob(ch)
 
-    def evaluate_actions(self, obs, ch):
+    def evaluate_actions(self, obs, ch, eps=1e-6):
         s, m = obs['obs'], obs['mask']
         values, prior = self._prior_distribution(s)
-        posterior = Categorical(prior.probs * m)
+        posterior = Categorical((prior.probs + eps) * m)
         return values, posterior.log_prob(ch), posterior.entropy() # additional values used by PPO.train
 
 class OptionsEnv(gym.Wrapper):
@@ -71,10 +72,10 @@ class OptionsEnv(gym.Wrapper):
             self.episode_start = False
             if self.done:
                 self.s = self.env.reset()
-                self.m = available_actions(self.env)
                 self.done = False
                 self.episode_start = True
 
+            self.m = available_actions(self.env)
             self.ch, self.value, self.log_prob = generator.policy.predict({
                 'obs': torch.tensor(self.s).unsqueeze(0).to(generator.policy.device),
                 'mask': torch.tensor(self.m).unsqueeze(0).to(generator.policy.device),
@@ -85,18 +86,16 @@ class OptionsEnv(gym.Wrapper):
 
             assert not self.done
             assert self.plan
-            assert feasible(self.env, self.plan, self.ch)
+            #assert feasible(self.env, self.plan, self.ch)
 
             while not self.done and self.plan and feasible(self.env, self.plan, self.ch):
                 self.a, self.plan = self.plan[0], self.plan[1:]
                 self.a = self.env._normalize(self.a)
                 self.nexts, _, self.done, _ = self.env.step(self.a)
-                self.nextm = available_actions(self.env)
 
                 self._after_step()
 
                 self.s = self.nexts
-                self.m = self.nextm
             
             yield from self._transitions()
 
@@ -131,6 +130,7 @@ class HLOptions(OptionsEnv):
         super().__init__(*args, **kwargs)
 
     def _after_choice(self):
+        self.obs = {'obs': np.copy(self.s), 'mask': np.copy(self.m)}
         self.r = 0
         self.steps = 0
 
@@ -145,7 +145,7 @@ class HLOptions(OptionsEnv):
     
     def _transitions(self):
         yield {
-            'obs': {'obs': self.s, 'mask': self.m},
+            'obs': self.obs,
             'action': self.ch,
             'reward': self.r.detach(),
             'episode_start': self.episode_start,
@@ -217,13 +217,14 @@ def check_future_collisions_fast(env, actions):
 
 def feasible(env, plan, ch):
     """Check if input profile is feasible given current `env` state. Action `ch=0` is safe fallback."""
-    return True
+    if ch == 0:
+        return True
 
     # zero pad plan - Take (T,) np plan and convert it to (T, nv, 1) torch.Tensor
     full_plan = torch.zeros(len(plan), env._env._nv, 1)
     full_plan[:, env._agent, 0] = torch.tensor(plan)
     valid = check_future_collisions_fast(env, [full_plan]) # check_future_collisions_fast takes in B-list and outputs (B,) bool tensor
-    return ch == 0 or valid.item()
+    return valid.item()
 
 def flatten_transitions(transitions):
     return {
@@ -292,7 +293,7 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=1024, di
         generator.tensorboard_log,
     )
 
-    for _ in range(epochs):
+    for _ in tqdm(range(epochs)):
         train_discriminator(LLOptions(env), generator, discriminator, num_samples=expert_batch_size)
         train_generator(HLOptions(env), generator, discriminator, num_samples=generator_steps)
     
