@@ -83,7 +83,7 @@ class OptionsEnv(gym.Wrapper):
     """
     Wrap an intersimple environment with an options generator
     """
-    def __init__(self, env, *args, **kwargs):
+    def __init__(self, env, render=False, *args, **kwargs):
         """
         Initialize wrapped environment and set high-level action and observation spaces
         """
@@ -94,39 +94,93 @@ class OptionsEnv(gym.Wrapper):
             'obs': env.observation_space,
             'mask': gym.spaces.Box(low=0, high=1, shape=(num_hl_options,)),
         })
+        self._hl_transition_buffer = []
+        self._ll_transition_buffer = []
+        self.render=render
 
-    def _after_choice(self):
-        pass
+    def _after_option_choice(self):
+        """
+        After initial option choice, 
+        """
+        self._hl_r = 0
+        self._hl_steps = 0
     
     def _after_step(self):
-        pass
+        """
+        After each step, add the ll transition to the appropriate buffer, add to reward, add to steps, and possibly render
+        """
 
-    def _transitions(self):
-        raise NotImplementedError('Use `LLOptions` or `HLOptions` for sampling.')
+        self._ll_transition_buffer.append({
+            'obs': self.s,
+            'next_obs': self.nexts,
+            'acts': np.array((self.a,)),
+            'dones': np.array(self.done),
+        })  
+        self.r += self.discount**self.steps * self.discriminator.discrim_net.reward_train(
+            state=torch.tensor(self.s).unsqueeze(0).to(self.discriminator.discrim_net.device()),
+            action=torch.tensor([[self.a]]).to(self.discriminator.discrim_net.device()),
+            next_state=torch.tensor(self.s).unsqueeze(0).to(self.discriminator.discrim_net.device()), # unused
+            done=torch.tensor(self.done).unsqueeze(0).to(self.discriminator.discrim_net.device()), # unused
+        )
+        self.steps += 1
+        if self.render:
+            self.env.render()
     
-    def sample(self, generator):
+    def _after_option(self):
+        """
+        After each low-level action, add the discounted discriminated reward score (given a discriminator)
+        """
+        self._hl_transition_buffer.append({
+            'obs': {'obs': self.os, 'mask': self.m},
+            'action': self.ch,
+            'reward': self.r.detach(),
+            'episode_start': self.episode_start,
+            'value': self.value.detach(),
+            'log_prob': self.log_prob.detach(),
+            'done': self.done,
+            })
+
+    def close(self, *args, **kwargs):
+        """
+        On 'close', close the environment
+        """
+        self.env.close(*args, **kwargs)
+    
+    def sample(self, generator, controller):
         """
         yield transitions using a generator
         Args:
             generator (sb3.PPO)
+            controller (str): 'high' or 'low' to yield from proper buffer
         Yields:
 
         """
         self.done = True
+        # DO I WANT TO EMPTY THE BUFFERS??? Probs naw
         while True:
+            
+            # yield from buffers to empty what was stored previously
+            if controller = 'high':
+                yield from self._hl_transition_buffer
+            elif controller == 'low':
+                yield from self._ll_transition_buffer
+            else:
+                raise('Improper buffer')
+            
             self.episode_start = False
-
             if self.done:
                 # reset environment
                 self.s = self.env.reset()
-                self.m = available_actions(self.env)
                 self.done = False
                 self.episode_start = True
+
+            self.os = self.s.copy() # option start state
+            self.m = available_actions(self.env)
 
             # set the action, the value of the start state, and the logprob of the action
             # according to the current environment state and mask
             self.ch, self.value, self.log_prob = generator.policy.predict({
-                'obs': torch.tensor(self.s).unsqueeze(0).to(generator.policy.device),
+                'obs': torch.tensor(self.os).unsqueeze(0).to(generator.policy.device),
                 'mask': torch.tensor(self.m).unsqueeze(0).to(generator.policy.device),
             })
 
@@ -134,7 +188,7 @@ class OptionsEnv(gym.Wrapper):
             self.plan = list(map(float, generate_plan(self.env, self.ch)))
 
             # run whatever _after_choice might dictate in a child class
-            self._after_choice()
+            self._after_option_choice()
 
             # some checks
             assert not self.done
@@ -152,110 +206,23 @@ class OptionsEnv(gym.Wrapper):
                 
                 # step through environment
                 self.nexts, _, self.done, _ = self.env.step(self.a)
-                self.nextm = available_actions(self.env)
 
                 # run whatever _after_step might dictate in child class
                 self._after_step()
 
                 # update state and mask to current
                 self.s = self.nexts
-                self.m = self.nextm
+            
+            # run whatever to do after option
+            self._after_option()
 
-            # transitions yielded from self._transitions() functions specied in child classes
-            yield from self._transitions()
-
-            ### NOTE: only yields after a full option has been executed / exited
-
-class LLOptions(OptionsEnv):
-    """Sample low-level (state, action) tuples for discriminator training."""
-    
-    def __init__(self, *args, **kwargs):
-        """
-        LLOption uses the true LL observations
-        """
-        super().__init__(*args, **kwargs)
-        # overwrite observation space to just output obs directly
-        self.observation_space = self.observation_space['obs'] 
-
-    def _after_choice(self):
-        """
-        After each option choice, initialize/reset the transition buffer
-        """
-        self._transition_buffer = []
-
-    def _after_step(self):
-        """
-        After each ll action, append s, s', a, done to transition buffer
-        """
-        self._transition_buffer.append({
-            'obs': self.s,
-            'next_obs': self.nexts,
-            'acts': np.array((self.a,)),
-            'dones': np.array(self.done),
-        })
-
-    def _transitions(self):
-        """
-        Yield from the transition buffer
-        """
-        yield from self._transition_buffer
-    
     def sample_ll(self, policy):
         """
         Not quite sure how this works????
         Why would you do this over LLOptions.sample(policy)
         """
-        # What happens if you return a yield from ????????
-        return self.sample(policy)
+        return self.sample(policy, 'low')
 
-class HLOptions(OptionsEnv):
-    """Sample high-level (state, action, reward) tuples for generator training."""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def _after_choice(self):
-        """
-        After an option selection, initialize total reward and number of steps
-        """
-        self.r = 0
-        self.steps = 0
-
-    def _after_step(self):
-        """
-        After each low-level action, add the discounted discriminated reward score (given a discriminator)
-        """
-        self.r += self.discount**self.steps * self.discriminator.discrim_net.reward_train(
-            state=torch.tensor(self.s).unsqueeze(0).to(self.discriminator.discrim_net.device()),
-            action=torch.tensor([[self.a]]).to(self.discriminator.discrim_net.device()),
-            next_state=torch.tensor(self.s).unsqueeze(0).to(self.discriminator.discrim_net.device()), # unused
-            done=torch.tensor(self.done).unsqueeze(0).to(self.discriminator.discrim_net.device()), # unused
-        )
-        self.steps += 1
-    
-    def _transitions(self):
-        """
-        Yield a single dictionary per high-level selected action
-        Fields:
-            obs: high-level state and mask at selection
-            action: chosen high-level action
-            reward: accumulated option reward
-            episode_start: whether the action was chosen at the episode start
-            value: the value estimate from the starting state
-            log_prob: the log_prob of the selected action from the starting state
-            done: whether the episode has ended
-
-        """
-        yield {
-            'obs': {'obs': self.s, 'mask': self.m},
-            'action': self.ch,
-            'reward': self.r.detach(),
-            'episode_start': self.episode_start,
-            'value': self.value.detach(),
-            'log_prob': self.log_prob.detach(),
-            'done': self.done,
-        }
-    
     def sample_hl(self, policy, discriminator):
         """
         Args:
@@ -266,21 +233,6 @@ class HLOptions(OptionsEnv):
         """
         self.discriminator = discriminator
         return self.sample(policy)
-
-class RenderOptions(LLOptions):
-
-    def _after_step(self):
-        """
-        Render the environment after each low-level step
-        """
-        super()._after_step()
-        self.env.render()
-    
-    def close(self, *args, **kwargs):
-        """
-        On 'close', close the environment
-        """
-        self.env.close(*args, **kwargs)
 
 def available_actions(env):
     """Return mask of available actions given current `env` state."""
@@ -498,7 +450,7 @@ if __name__ == '__main__':
     # %%
     model = stable_baselines3.PPO.load(model_name) # not actually used
 
-    env = RenderOptions(NRasterizedRandomAgent(**env_settings))
+    env = OptionsGail(NRasterizedRandomAgent(**env_settings), render=True)
     for s in env.sample_ll(generator):
         if s['dones']:
             break
