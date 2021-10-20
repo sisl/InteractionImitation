@@ -18,7 +18,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from tqdm import tqdm
 
 import logging 
-#logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is safe fallback
 
@@ -216,13 +216,60 @@ def check_future_collisions_fast(env, actions):
 
     return (distance > min_distance).all(-1).all(-1)
 
+def check_future_collisions_circles(env, actions, n_circles:int=2):
+    """Checks whether `env._agent` would collide with other agents assuming `actions` as input.
+    
+    Vehicles are (over-)approximated by multiple circles.
+
+    Args:
+        env (gym.Env): current environment state
+        actions (list of torch.Tensor): list of B (T, nv, adims) T-length action profiles
+    Returns:
+        feasible (torch.Tensor): tensor of shape (B,) indicating whether the respective action profiles are collision-free
+    """
+    assert n_circles >= 2
+    B, (T, nv, _) = len(actions), actions[0].shape
+
+    states = torch.stack(env._env.propagate_action_profile(actions), axis=0)
+    assert states.shape == (B, T, nv, 5)
+    centers = states[:, :, :, :2]
+    psi = states[:, :, :, 3]
+    lon = torch.stack([psi.cos(), psi.sin()],dim=-1) # (B, T, nv, 2)
+
+    # offset between [-env._env.lengths+env._env.widths/2, env._env.lengths/2-env._env.widths/2]
+    back = (-env._env._lengths/2+env._env._widths/2).unsqueeze(-1) # (nv, 1)
+    length = (env._env._lengths-env._env._widths).unsqueeze(-1) # (nv, 1)
+    diff_d =  back + length*(torch.arange(n_circles)/(n_circles-1)).unsqueeze(0)  # (nv, n_circles) 
+    assert diff_d.shape == (nv, n_circles)
+    
+    offsets = diff_d[None, None, :, :, None] *  lon[:, :, :, None, :]
+    assert offsets.shape == (B, T, nv, n_circles, 2)
+
+    expanded_centers=centers.unsqueeze(-2) + offsets #(B, T, nv, n_circles, 2)
+    assert expanded_centers.shape == (B, T, nv, n_circles, 2)
+    agent_centers = expanded_centers[:,:,env._agent:env._agent+1,:,:] #(B, T, 1, n_circles, 2)
+    ds = expanded_centers.reshape((B, T, nv*n_circles, 1, 2)) - agent_centers #(B, T, nv*nc,1, 2) - (B, T, 1, nc, 2) = (B, T, nv*nc, nc, 2) 
+
+    distance = (ds**2).sum(-1).sqrt().reshape((B, T, nv, n_circles, n_circles)) # (B, T, nv, nc, nc)
+    distance = torch.where(distance.isnan(), np.inf*torch.ones_like(distance), distance) # only collide with spawned agents
+    distance[:, :, env._agent] = np.inf # cannot collide with itself
+    assert distance.shape == (B, T, nv, n_circles, n_circles)
+
+    radius = env._env._widths*np.sqrt(2) / 2
+    min_distance = radius[env._agent] + radius
+    min_distance = min_distance[None, None, :, None, None]
+    assert min_distance.shape == (1, 1, nv, 1, 1)
+
+    return (distance > min_distance).all(-1).all(-1).all(-1).all(-1)
+
 def feasible(env, plan, ch):
     """Check if input profile is feasible given current `env` state. Action `ch=0` is safe fallback."""
     
     # zero pad plan - Take (T,) np plan and convert it to (T, nv, 1) torch.Tensor
     full_plan = torch.zeros(len(plan), env._env._nv, 1)
     full_plan[:, env._agent, 0] = torch.tensor(plan)
-    valid = check_future_collisions_fast(env, [full_plan]) # check_future_collisions_fast takes in B-list and outputs (B,) bool tensor
+    # valid = check_future_collisions_fast(env, [full_plan]) # check_future_collisions_fast takes in B-list and outputs (B,) bool tensor
+    valid = check_future_collisions_circles(env, [full_plan])
     return ch == 0 or valid.item()
 
 def flatten_transitions(transitions):
@@ -314,7 +361,7 @@ if __name__ == '__main__':
         transitions,
         env_class=env_class,
         env_settings=env_settings,
-        epochs=10, 
+        epochs=2, 
         discrim_batch_size=32, 
         generator_steps=2048, 
         discount=0.99
