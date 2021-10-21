@@ -100,7 +100,7 @@ def save_video(env, expert):
         env.render()
     env.close()
 
-def load_experts(expert_files=[]):
+def load_experts(expert_files):
     """
     Load expert trajectories from files and combine their transitions into a single RB
 

@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 import numpy as np
-from src.expert_data import load_expert_data
+from src.data.expert_data import load_expert_data
 import os
 opj = os.path.join
 

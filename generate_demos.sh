@@ -6,6 +6,4 @@
 # expert_class:str='NormalizedIntersimpleExpert',  
 # expert_args:dict={mu:0.001}):
 
-cd ./src/data
-python -m expert --locs='[DR_USA_Roundabout_FT]' 
-cd ../
+python -m src.data.expert --locs='[DR_USA_Roundabout_FT]' 
