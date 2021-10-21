@@ -109,11 +109,12 @@ def load_experts(expert_files):
     Returns:
         transitions (list): list of combined expert episode transitions 
     """
-    transitions = []
+    trajectories = []
     for file in tqdm(expert_files):
         with open(file, "rb") as f:
-            trajectories = pickle.load(f)
-        transitions = transitions + rollout.flatten_trajectories(trajectories)
+            new_trajectories = pickle.load(f)
+        trajectories += new_trajectories
+    transitions = rollout.flatten_trajectories(trajectories)
     return transitions
 
 def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedIncrementingAgent', path=None, min_timesteps=None, min_episodes=None, video=False, env_args={}, policy_args={}):
