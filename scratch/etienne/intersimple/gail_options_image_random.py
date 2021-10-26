@@ -4,7 +4,7 @@ from imitation.algorithms import adversarial
 import stable_baselines3
 import torch.utils.data
 import numpy as np
-from intersim.envs.intersimple import NRasterizedRandomAgent
+from intersim.envs.intersimple import NRasterizedRouteRandomAgent
 import itertools
 from torch.distributions import Categorical
 import gym
@@ -21,12 +21,12 @@ from gail.options import OptionsEnv, LLOptions, HLOptions, RenderOptions
 from gail.train import train_discriminator, train_generator
 
 model_name = 'gail_options_image_random'
-env_settings = {'width': 36, 'height': 36, 'm_per_px': 2}
+env_settings = {'width': 70, 'height': 70, 'm_per_px': 1}
 
 ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is safe fallback
 
 def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=1024, discount=0.99):
-    env = NRasterizedRandomAgent(**env_settings)
+    env = NRasterizedRouteRandomAgent(**env_settings)
     env.discount = discount
 
     tempdir = tempfile.TemporaryDirectory(prefix="quickstart")
@@ -34,7 +34,7 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=1024, di
     logger.configure(tempdir_path / "GAIL/")
     print(f"All Tensorboards and logging are being written inside {tempdir_path}/.")
 
-    venv = make_vec_env(NRasterizedRandomAgent, n_envs=1, env_kwargs=env_settings)
+    venv = make_vec_env(NRasterizedRouteRandomAgent, n_envs=1, env_kwargs=env_settings)
     discriminator = adversarial.GAIL(
         expert_data=expert_data,
         expert_batch_size=expert_batch_size,
@@ -68,7 +68,7 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=1024, di
 if __name__ == '__main__':
     # %%
  
-    with open("data/NormalizedIntersimpleExpertMu.001N10000_NRasterizedRandomAgentw36h36mppx2.pkl", "rb") as f:
+    with open("data/NormalizedIntersimpleExpertMu.001N10000_NRasterizedRouteRandomAgentw70h70mppx1.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
     generator = train(transitions, epochs=100)
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     # %%
     model = stable_baselines3.PPO.load(model_name)
 
-    env = RenderOptions(NRasterizedRandomAgent(**env_settings))
+    env = RenderOptions(NRasterizedRouteRandomAgent(**env_settings))
 
     for s in env.sample_ll(model):
         if s['dones']:
