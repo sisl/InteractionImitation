@@ -1,5 +1,8 @@
 # %%
-from gail.discriminator import CnnDiscriminator, CnnDiscriminatorFlatAction
+import sys
+sys.path.append('../../../')
+
+from src.discriminator import CnnDiscriminator, CnnDiscriminatorFlatAction
 from imitation.algorithms import adversarial
 import stable_baselines3
 import torch.utils.data
@@ -16,9 +19,9 @@ import pathlib
 from imitation.util import logger
 from stable_baselines3.common.env_util import make_vec_env
 from tqdm import tqdm
-from gail.policy import OptionsCnnPolicy
-from gail.options import OptionsEnv, LLOptions, HLOptions, RenderOptions
-from gail.train import train_discriminator, train_generator
+from src.policies.options import OptionsCnnPolicy
+from src.gail.options import OptionsEnv, LLOptions, HLOptions, RenderOptions
+from src.gail.train import train_discriminator, train_generator
 
 model_name = 'gail_options_image'
 env_settings = {'agent': 51, 'width': 36, 'height': 36, 'm_per_px': 2}
@@ -78,7 +81,7 @@ if __name__ == '__main__':
     # %%
     model = stable_baselines3.PPO.load(model_name)
 
-    env = RenderOptions(NRasterized(**env_settings))
+    env = RenderOptions(NRasterized(**env_settings), options=ALL_OPTIONS)
 
     for s in env.sample_ll(model):
         if s['dones']:

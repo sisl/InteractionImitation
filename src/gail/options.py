@@ -1,6 +1,6 @@
 import gym
 import torch
-from .collisions import feasible
+from src.util.collisions import feasible
 import numpy as np
 
 class OptionsEnv(gym.Wrapper):

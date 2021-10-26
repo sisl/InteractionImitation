@@ -15,7 +15,7 @@ def feasible(env, plan, ch, method='exact'):
     if method=='circle':
         valid = check_future_collisions_fast(env, [full_plan]) 
     elif method=='ncircles':
-        valid = check_future_collisions_ncircles(env, [fullplan])
+        valid = check_future_collisions_ncircles(env, [full_plan])
     elif method=='exact':
         valid = check_future_collisions_exact(env, [full_plan])
     else:
@@ -152,4 +152,3 @@ def check_future_collisions_exact(env, actions):
 
     collision_tensor[colliding_mask] = ~exact_collisions
     return collision_tensor.all(-1).all(-1) 
-
