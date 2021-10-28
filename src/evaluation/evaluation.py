@@ -1,3 +1,5 @@
+import torch
+import numpy as np
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.evaluation import evaluate_policy
 
@@ -36,11 +38,6 @@ class Evaluation:
 
         assert len(self._trajectories) >= self.n_eval_episodes
 
-        # average velocity of each episode
-        # this first averages velocity over single trajectories and then averages over trajectories
-        # avg_velocities = [nanmean(torch.stack(t)[:,2]) for t in self._trajectories]
-        # avg_velocity = np.mean(avg_velocities)
-        
         # velocities produced by generator
         policy_velocities = torch.cat([torch.stack(t)[:,2] for t in self._trajectories])
         # if episodes terminate without collisions, then the state is fully nan
@@ -81,12 +78,10 @@ class Evaluation:
             self._n_collisions += 1
 
         # if last episode is done, start new trajectory
+        # this is currently not necessary, only if velocity is to be averaged over individual trajectories first
+        # and then averaging over all trajectories
         if self._episode_done:
             self._trajectories.append([])
-        agent_state = info['projected_state'][_agent]
-        self._trajectories[-1].append(agent_state)
-        # this does not work since agent_action are high level options
-        # agent_action = local_vars['actions'][venv_i] # normalized intersimple action
-        # acceleration = env._unnormalize(agent_action) if isinstance(env, NormalizedActionSpace) else agent_action
+        self._trajectories[-1].append(info['projected_state'][_agent])
         self._accelerations.append(info['action_taken'][_agent])
         self._episode_done = done
