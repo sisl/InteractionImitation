@@ -1,13 +1,13 @@
 # %%
-# import sys
-# sys.path.append('../../../')
+import sys
+sys.path.append('../../../')
 
 from src.discriminator import CnnDiscriminator, CnnDiscriminatorFlatAction
 from imitation.algorithms import adversarial
 import stable_baselines3
 import torch.utils.data
 import numpy as np
-from intersim.envs.intersimple import NRasterized, NRasterizedRandomAgent, speed_reward
+from intersim.envs.intersimple import NRasterized, speed_reward
 import itertools
 import functools
 from torch.distributions import Categorical
@@ -26,13 +26,12 @@ from src.gail.train import train_discriminator, train_generator
 from src.evaluation.evaluation import Evaluation
 
 model_name = 'gail_options_image'
-Env = NRasterizedRandomAgent
-env_settings = {'width': 36, 'height': 36, 'm_per_px': 2}
+env_settings = {'agent': 51, 'width': 36, 'height': 36, 'm_per_px': 2}
 
-ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5]] # option 0 is safe fallback
+ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10]] # option 0 is safe fallback
 
-def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=32, discount=0.99):
-    env = Env(**env_settings)
+def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=1024, discount=0.99):
+    env = NRasterized(**env_settings)
     env.discount = discount
 
     tempdir = tempfile.TemporaryDirectory(prefix="quickstart")
@@ -40,7 +39,7 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=32, disc
     logger.configure(tempdir_path / "GAIL/")
     print(f"All Tensorboards and logging are being written inside {tempdir_path}/.")
 
-    venv = make_vec_env(Env, n_envs=1, env_kwargs=env_settings)
+    venv = make_vec_env(NRasterized, n_envs=1, env_kwargs=env_settings)
     discriminator = adversarial.GAIL(
         expert_data=expert_data,
         expert_batch_size=expert_batch_size,
@@ -68,41 +67,19 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=32, disc
         train_discriminator(LLOptions(env, options=ALL_OPTIONS), generator, discriminator, num_samples=expert_batch_size)
         train_generator(HLOptions(env, options=ALL_OPTIONS), generator, discriminator, num_samples=generator_steps)
 
-        eval_env = Env(reward=functools.partial(speed_reward, collision_penalty=0.), **env_settings)
-        ev = Evaluation(eval_env, n_eval_episodes=10)
+        eval_env = env
+        ev = Evaluation(eval_env, n_eval_episodes=100)
         ev.evaluate(epoch, generator, discriminator, expert_data)
     
     return generator
-
-        
-
-
-# class CAPolicy:
-#     def __init__(self, a):
-#         self.a = torch.tensor([a])
-
-#     def predict(self, obs, state=None, deterministic=False):
-#         return self.a, state
-
 
 # %%
 if __name__ == '__main__':
     # %%
  
-    with open("scratch/etienne/intersimple/data/NormalizedIntersimpleExpertMu.001N200_NRasterizedInfoAgent51w36h36mppx2.pkl", "rb") as f:
+    with open("data/NormalizedIntersimpleExpertMu.001_NRasterizedInfoAgent51w36h36mppx2.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
-
-###
-    # env = NRasterizedIncrementingAgent(reward=functools.partial(speed_reward, collision_penalty=0.), **env_settings)
-    # generator = CAPolicy(.5)
-
-    # ev = Evaluation(env, 10)
-    # ev.evaluate(1, generator, None, transitions)
-
-    # exit()
-###
-
     generator = train(transitions)
 
     generator.save(model_name)
@@ -110,7 +87,7 @@ if __name__ == '__main__':
     # %%
     model = stable_baselines3.PPO.load(model_name)
 
-    env = RenderOptions(NRasterizedRandomAgent(**env_settings), options=ALL_OPTIONS)
+    env = RenderOptions(NRasterized(**env_settings), options=ALL_OPTIONS)
 
     for s in env.sample_ll(model):
         if s['dones']:
