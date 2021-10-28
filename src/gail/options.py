@@ -36,7 +36,7 @@ class OptionsEnv(gym.Wrapper):
                 self.episode_start = True
 
             self.m = available_actions(self.env, self.options)
-            self.ch, self.value, self.log_prob = generator.policy.predict({
+            self.ch, self.value, self.log_prob = generator.policy.forward({
                 'obs': torch.tensor(self.s).unsqueeze(0).to(generator.policy.device),
                 'mask': torch.tensor(self.m).unsqueeze(0).to(generator.policy.device),
             })
