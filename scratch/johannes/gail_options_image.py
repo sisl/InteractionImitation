@@ -8,7 +8,7 @@ import stable_baselines3
 from stable_baselines3.common.evaluation import evaluate_policy
 import torch.utils.data
 import numpy as np
-from intersim.envs.intersimple import Intersimple, NormalizedActionSpace, NRasterized, NRasterizedInfo, NRasterizedIncrementingAgent, NRasterizedRandomAgent, speed_reward
+from intersim.envs.intersimple import Intersimple, NRasterized, NRasterizedInfo, NRasterizedIncrementingAgent, NRasterizedRandomAgent, speed_reward
 import itertools
 import functools
 from torch.distributions import Categorical
@@ -24,10 +24,9 @@ from tqdm import tqdm
 from src.policies.options import OptionsCnnPolicy
 from src.gail.options import OptionsEnv, LLOptions, HLOptions, RenderOptions
 from src.gail.train import train_discriminator, train_generator
-from src.metrics import nanmean, divergence, visualize_distribution
 
 model_name = 'gail_options_image'
-Env = NRasterized
+Env = NRasterizedRandomAgent
 env_settings = {'width': 36, 'height': 36, 'm_per_px': 2}
 
 ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5]] # option 0 is safe fallback
@@ -41,7 +40,7 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=32, disc
     logger.configure(tempdir_path / "GAIL/")
     print(f"All Tensorboards and logging are being written inside {tempdir_path}/.")
 
-    venv = make_vec_env(NRasterized, n_envs=1, env_kwargs=env_settings)
+    venv = make_vec_env(Env, n_envs=1, env_kwargs=env_settings)
     discriminator = adversarial.GAIL(
         expert_data=expert_data,
         expert_batch_size=expert_batch_size,
@@ -74,94 +73,6 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=32, disc
         ev.evaluate(epoch, generator, discriminator, expert_data)
     
     return generator
-
-from stable_baselines3.common.vec_env import VecEnv
-class Evaluation:
-    def __init__(self, eval_env, n_eval_episodes=10):
-        # if env is a VecEnv, the code needs to be adapted, since the callback will be called after each step, 
-        # so transitions of different envs will be mixed and the total number of episodes could be larger than n_eval_episodes!
-        assert not isinstance(eval_env, VecEnv)
-        self.env = eval_env
-        self.n_eval_episodes = n_eval_episodes
-        self.reset()
-
-    def reset(self):
-        self._n_collisions = 0
-        self._trajectories = []
-        self._episode_done = True
-        self._accelerations = []
-
-    def evaluate(self, epoch, generator, discriminator, expert_data):
-        self.reset()
-        metrics = {}
-        
-        episode_rewards, episode_lengths = evaluate_policy(
-            generator, 
-            self.env,
-            n_eval_episodes=self.n_eval_episodes,
-            callback=self.evaluate_policy_callback, 
-            return_episode_rewards=True
-        )
-
-        collision_rate = self._n_collisions / self.n_eval_episodes
-        metrics['collision_rate'] = collision_rate
-
-        assert len(self._trajectories) >= self.n_eval_episodes
-
-        # average velocity of each episode
-        # this first averages velocity over single trajectories and then averages over trajectories
-        # avg_velocities = [nanmean(torch.stack(t)[:,2]) for t in self._trajectories]
-        # avg_velocity = np.mean(avg_velocities)
-        
-        # velocities produced by generator
-        policy_velocities = torch.cat([torch.stack(t)[:,2] for t in self._trajectories])
-        # if episodes terminate without collisions, then the state is fully nan
-        policy_velocities = policy_velocities[~torch.isnan(policy_velocities)]
-
-        # expert velocities
-        extract_state = lambda info: info['projected_state'][info['agent']]
-        expert_velocities = torch.stack([extract_state(info) for info in expert_data.infos])[:,2]
-        expert_velocities = expert_velocities[~torch.isnan(expert_velocities)]
-
-        metrics['avg_velocity_loss'] = (expert_velocities.mean() - policy_velocities.mean()).item()
-        metrics['velocity_divergence'] = divergence(policy_velocities, expert_velocities, type='js')
-        
-
-        # accelerations produced by generator
-        policy_accelerations = torch.tensor(self._accelerations)
-        # expert accelerations
-        extract_accel = lambda info: info['action_taken'][info['agent']]
-        expert_accelerations = torch.cat([extract_accel(info) for info in expert_data.infos])
-
-        metrics['acceleration_divergence'] = divergence(policy_accelerations, expert_accelerations, type='js')
-        visualize_distribution(expert_accelerations, policy_accelerations, 'output/_action_viz{:02}'.format(epoch)) 
-
-        print(metrics)
-        return metrics
-
-    def evaluate_policy_callback(self, local_vars, global_vars):
-        venv_i = local_vars['i']
-        info = local_vars['info']
-        done = local_vars['done']
-        _agent = info['agent']
-        env = local_vars['env'].envs[venv_i]
-        assert isinstance(env, Intersimple)
-
-        # Increase collision counter if episode terminated with a collision
-        if info['collision']:
-            assert done
-            self._n_collisions += 1
-
-        # if last episode is done, start new trajectory
-        if self._episode_done:
-            self._trajectories.append([])
-        agent_state = info['projected_state'][_agent]
-        self._trajectories[-1].append(agent_state)
-        # this does not work since agent_action are high level options
-        # agent_action = local_vars['actions'][venv_i] # normalized intersimple action
-        # acceleration = env._unnormalize(agent_action) if isinstance(env, NormalizedActionSpace) else agent_action
-        self._accelerations.append(info['action_taken'][_agent])
-        self._episode_done = done
 
         
 
