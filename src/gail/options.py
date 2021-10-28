@@ -40,7 +40,7 @@ class OptionsEnv(gym.Wrapper):
                 # action 0 is considered safe fallback
                 self.m[0] = True
             
-            self.ch, self.value, self.log_prob = generator.policy.predict({
+            self.ch, self.value, self.log_prob = generator.policy.forward({
                 'obs': torch.tensor(self.s).unsqueeze(0).to(generator.policy.device),
                 'mask': self.m.unsqueeze(0).to(generator.policy.device),
             })

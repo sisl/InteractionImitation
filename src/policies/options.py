@@ -22,7 +22,7 @@ class OptionsCnnPolicy(stable_baselines3.common.policies.ActorCriticCnnPolicy):
         values = self.value_net(latent_vf)
         return values, distribution.distribution
 
-    def predict(self, obs, eps=1e-6):
+    def forward(self, obs, eps=1e-6):
         """
         Will mask invalid states before making action selections
         Args:
