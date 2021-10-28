@@ -24,6 +24,7 @@ from tqdm import tqdm
 from src.policies.options import OptionsCnnPolicy
 from src.gail.options import OptionsEnv, LLOptions, HLOptions, RenderOptions
 from src.gail.train import train_discriminator, train_generator
+from src.evaluation.evaluation import Evaluation
 
 model_name = 'gail_options_image'
 Env = NRasterizedRandomAgent
