@@ -331,7 +331,7 @@ if __name__ == '__main__':
     
     #env_class = NRasterized
     #env_settings = {'agent': 51, 'width': 36, 'height': 36, 'm_per_px': 2}
-    files = ['../../../expert_data/DR_USA_Roundabout_FT0/track%04i/expert.pkl'%(i) for i in range(5)]
+    files = ['../../../expert_data/DR_USA_Roundabout_FT/track%04i/expert.pkl'%(i) for i in range(5)]
     transitions=load_experts(files)
 
     generator = train(
