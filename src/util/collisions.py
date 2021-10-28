@@ -4,23 +4,25 @@ from intersim.collisions import state_to_polygon
 
 def feasible(env, plan, ch, method='exact'):
     """Check if input profile is feasible given current `env` state. Action `ch=0` is safe fallback."""
-    if ch == 0:
-        return True
+    # zero pad plan - Take (B, T) or (T,) np plan and convert it to (B, T, nv, 1) torch.Tensor
+    plan = torch.tensor(plan)
+    plan = plan.reshape(-1, plan.shape[-1])
+    full_plan = torch.zeros(*plan.shape, env._env._nv, 1)
+    full_plan[:, :, env._agent, 0] = plan
 
-    # zero pad plan - Take (T,) np plan and convert it to (T, nv, 1) torch.Tensor
-    full_plan = torch.zeros(len(plan), env._env._nv, 1)
-    full_plan[:, env._agent, 0] = torch.tensor(plan)
+    ch = torch.tensor(ch)
 
     # check_future_collisions_fast takes in B-list and outputs (B,) bool tensor
     if method=='circle':
-        valid = check_future_collisions_fast(env, [full_plan]) 
+        valid = check_future_collisions_fast(env, full_plan) 
     elif method=='ncircles':
-        valid = check_future_collisions_ncircles(env, [full_plan])
+        valid = check_future_collisions_ncircles(env, full_plan)
     elif method=='exact':
-        valid = check_future_collisions_exact(env, [full_plan])
+        valid = check_future_collisions_exact(env, full_plan)
     else:
         raise NotImplementedError('Invalid collision-checking method')
-    return valid.item()
+
+    return valid | (ch == 0)
 
 def check_future_collisions_ncircles(env, actions, n_circles:int=2):
     """Checks whether `env._agent` would collide with other agents assuming `actions` as input.
@@ -36,7 +38,7 @@ def check_future_collisions_ncircles(env, actions, n_circles:int=2):
     assert n_circles >= 2
     B, (T, nv, _) = len(actions), actions[0].shape
 
-    states = torch.stack(env._env.propagate_action_profile(actions), axis=0)
+    states = env._env.propagate_action_profile_vectorized(actions)
     assert states.shape == (B, T, nv, 5)
     centers = states[:, :, :, :2]
     psi = states[:, :, :, 3]
@@ -81,7 +83,7 @@ def check_future_collisions_circle(env, actions):
     """
     B, (T, nv, _) = len(actions), actions[0].shape
 
-    states = torch.stack(env._env.propagate_action_profile(actions), axis=0)
+    states = env._env.propagate_action_profile_vectorized(actions)
     assert states.shape == (B, T, nv, 5)
 
     distance = ((states[:, :, :, :2] - states[:, :, env._agent:env._agent+1, :2])**2).sum(-1).sqrt()
