@@ -8,7 +8,7 @@ import stable_baselines3
 from stable_baselines3.common.evaluation import evaluate_policy
 import torch.utils.data
 import numpy as np
-from intersim.envs.intersimple import Intersimple, NRasterized, NRasterizedIncrementingAgent, NRasterizedRandomAgent, speed_reward
+from intersim.envs.intersimple import Intersimple, NormalizedActionSpace, NRasterized, NRasterizedInfo, NRasterizedIncrementingAgent, NRasterizedRandomAgent, speed_reward
 import itertools
 import functools
 from torch.distributions import Categorical
@@ -27,12 +27,13 @@ from src.gail.train import train_discriminator, train_generator
 from src.metrics import nanmean, divergence, visualize_distribution
 
 model_name = 'gail_options_image'
+Env = NRasterized
 env_settings = {'width': 36, 'height': 36, 'm_per_px': 2}
 
 ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5]] # option 0 is safe fallback
 
 def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=32, discount=0.99):
-    env = NRasterizedRandomAgent(**env_settings)
+    env = Env(**env_settings)
     env.discount = discount
 
     tempdir = tempfile.TemporaryDirectory(prefix="quickstart")
@@ -68,7 +69,7 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=32, disc
         train_discriminator(LLOptions(env, options=ALL_OPTIONS), generator, discriminator, num_samples=expert_batch_size)
         train_generator(HLOptions(env, options=ALL_OPTIONS), generator, discriminator, num_samples=generator_steps)
 
-        eval_env = NRasterizedRandomAgent(reward=functools.partial(speed_reward, collision_penalty=0.), **env_settings)
+        eval_env = Env(reward=functools.partial(speed_reward, collision_penalty=0.), **env_settings)
         ev = Evaluation(eval_env, n_eval_episodes=10)
         ev.evaluate(epoch, generator, discriminator, expert_data)
     
@@ -88,10 +89,11 @@ class Evaluation:
         self._n_collisions = 0
         self._trajectories = []
         self._episode_done = True
+        self._accelerations = []
 
     def evaluate(self, epoch, generator, discriminator, expert_data):
         self.reset()
-        info = {}
+        metrics = {}
         
         episode_rewards, episode_lengths = evaluate_policy(
             generator, 
@@ -102,7 +104,7 @@ class Evaluation:
         )
 
         collision_rate = self._n_collisions / self.n_eval_episodes
-        info['collision_rate'] = collision_rate
+        metrics['collision_rate'] = collision_rate
 
         assert len(self._trajectories) >= self.n_eval_episodes
 
@@ -113,6 +115,7 @@ class Evaluation:
         
         # velocities produced by generator
         policy_velocities = torch.cat([torch.stack(t)[:,2] for t in self._trajectories])
+        # if episodes terminate without collisions, then the state is fully nan
         policy_velocities = policy_velocities[~torch.isnan(policy_velocities)]
 
         # expert velocities
@@ -120,19 +123,28 @@ class Evaluation:
         expert_velocities = torch.stack([extract_state(info) for info in expert_data.infos])[:,2]
         expert_velocities = expert_velocities[~torch.isnan(expert_velocities)]
 
-        info['avg_velocity_loss'] = expert_velocities.mean() - policy_velocities.mean()
+        metrics['avg_velocity_loss'] = (expert_velocities.mean() - policy_velocities.mean()).item()
+        metrics['velocity_divergence'] = divergence(policy_velocities, expert_velocities, type='js')
+        
 
-        # divergence (true, policy)
+        # accelerations produced by generator
+        policy_accelerations = torch.tensor(self._accelerations)
+        # expert accelerations
+        extract_accel = lambda info: info['action_taken'][info['agent']]
+        expert_accelerations = torch.cat([extract_accel(info) for info in expert_data.infos])
 
-        # same for acceleration
+        metrics['acceleration_divergence'] = divergence(policy_accelerations, expert_accelerations, type='js')
+        visualize_distribution(expert_accelerations, policy_accelerations, 'output/_action_viz{:02}'.format(epoch)) 
 
-        print(info)
-        return info
+        print(metrics)
+        return metrics
 
     def evaluate_policy_callback(self, local_vars, global_vars):
+        venv_i = local_vars['i']
         info = local_vars['info']
         done = local_vars['done']
-        env = local_vars['env'].envs[local_vars['i']]
+        _agent = info['agent']
+        env = local_vars['env'].envs[venv_i]
         assert isinstance(env, Intersimple)
 
         # Increase collision counter if episode terminated with a collision
@@ -143,7 +155,12 @@ class Evaluation:
         # if last episode is done, start new trajectory
         if self._episode_done:
             self._trajectories.append([])
-        self._trajectories[-1].append(info['projected_state'][env._agent])
+        agent_state = info['projected_state'][_agent]
+        self._trajectories[-1].append(agent_state)
+        # this does not work since agent_action are high level options
+        # agent_action = local_vars['actions'][venv_i] # normalized intersimple action
+        # acceleration = env._unnormalize(agent_action) if isinstance(env, NormalizedActionSpace) else agent_action
+        self._accelerations.append(info['action_taken'][_agent])
         self._episode_done = done
 
         
@@ -160,20 +177,21 @@ class Evaluation:
 # %%
 if __name__ == '__main__':
     # %%
-
-    # env = NRasterizedIncrementingAgent(reward=functools.partial(speed_reward, collision_penalty=0.), **env_settings)
-    # generator = CAPolicy(0.0)
-
-    # ev = Evaluation(env, 10)
-    # ev.evaluate(1, generator, None, None)
-
-    # exit()
-
-    # %%
  
     with open("scratch/etienne/intersimple/data/NormalizedIntersimpleExpertMu.001N200_NRasterizedInfoAgent51w36h36mppx2.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
+
+###
+    # env = NRasterizedIncrementingAgent(reward=functools.partial(speed_reward, collision_penalty=0.), **env_settings)
+    # generator = CAPolicy(.5)
+
+    # ev = Evaluation(env, 10)
+    # ev.evaluate(1, generator, None, transitions)
+
+    # exit()
+###
+
     generator = train(transitions)
 
     generator.save(model_name)
