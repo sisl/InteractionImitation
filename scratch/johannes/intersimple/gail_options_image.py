@@ -24,6 +24,8 @@ from src.policies.options import OptionsCnnPolicy
 from src.gail.options import OptionsEnv, LLOptions, HLOptions, RenderOptions
 from src.gail.train import train_discriminator, train_generator
 from src.evaluation.evaluation import Evaluation
+from torch.utils.tensorboard import SummaryWriter
+
 
 model_name = 'gail_options_image'
 env_settings = {'agent': 51, 'width': 36, 'height': 36, 'm_per_px': 2}
@@ -63,13 +65,16 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=1024, di
         generator.tensorboard_log,
     )
 
+    filestr = os.path.join('out', model_name)
+    writer = SummaryWriter(filestr)
+    ev = Evaluation(filestr, env, expert_data, n_eval_episodes=100)
     for epoch in tqdm(range(epochs)):
         train_discriminator(LLOptions(env, options=ALL_OPTIONS), generator, discriminator, num_samples=expert_batch_size)
         train_generator(HLOptions(env, options=ALL_OPTIONS), generator, discriminator, num_samples=generator_steps)
 
-        eval_env = env # possibly define eval env on different location
-        ev = Evaluation(eval_env, n_eval_episodes=100)
-        ev.evaluate(epoch, generator, discriminator, expert_data)
+        metrics = ev.evaluate(epoch, generator, discriminator)
+        for metric, value in metrics.items():
+            writer.add_scalar(metric, value, epoch)
     
     return generator
 
@@ -77,7 +82,7 @@ def train(expert_data, epochs=20, expert_batch_size=32, generator_steps=1024, di
 if __name__ == '__main__':
     # %%
  
-    with open("../../../scratch/etienne/intersimple/data/NormalizedIntersimpleExpertMu.001_NRasterizedInfoAgent51w36h36mppx2.pkl", "rb") as f:
+    with open("scratch/etienne/intersimple/data/NormalizedIntersimpleExpertMu.001_NRasterizedInfoAgent51w36h36mppx2.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
     generator = train(transitions)

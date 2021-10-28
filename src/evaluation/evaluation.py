@@ -65,7 +65,7 @@ class Evaluation:
         policy_accelerations = torch.tensor(self._accelerations)
 
         metrics['acceleration_divergence'] = divergence(policy_accelerations, self.expert_accelerations, type='js')
-        visualize_distribution(self.expert_accelerations, policy_accelerations, os.path.join(self.filestr, '_action_viz{:02}'.format(epoch)) 
+        visualize_distribution(self.expert_accelerations, policy_accelerations, os.path.join(self.filestr, '_action_viz{:02}'.format(epoch))) 
 
         print(metrics)
         return metrics
