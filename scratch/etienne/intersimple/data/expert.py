@@ -49,6 +49,8 @@ class IntersimpleExpert(BasePolicy):
         raise NotImplementedError()
 
     def _action(self):
+        # RandomLocation mixin re-initializes the intersim sub-env
+        self._intersim_expert._intersim = self._intersimple._env
         return self._intersim_expert._action()[self._intersimple._agent]
 
     def predict(self, *args, **kwargs):
