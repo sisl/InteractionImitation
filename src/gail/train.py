@@ -9,10 +9,11 @@ def flatten_transitions(transitions):
         'dones': np.stack(list(t['dones'] for t in transitions), axis=0),
     }
 
-def train_discriminator(env, generator, discriminator, num_samples):
+def train_discriminator(env, generator, discriminator, num_samples, n_updates=1):
     transitions = list(itertools.islice(env.sample_ll(generator), num_samples))
     generator_samples = flatten_transitions(transitions)
-    discriminator.train_disc(gen_samples=generator_samples)
+    for _ in range(n_updates):
+        discriminator.train_disc(gen_samples=generator_samples)
 
 def train_generator(env, generator, discriminator, num_samples):
     generator_samples = list(itertools.islice(env.sample_hl(generator, discriminator), num_samples+1))
