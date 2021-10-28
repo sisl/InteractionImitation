@@ -1,4 +1,4 @@
-from intersim.envs.intersimple import Intersimple
+from intersim.envs.intersimple import Intersimple, InfoFilter
 from stable_baselines3.common.policies import BasePolicy
 import gym
 import intersim.envs.intersimple
@@ -117,6 +117,7 @@ def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedRandomA
         save_video(env, policy)
     
     path = path or (policy.__class__.__name__ + '_' + env.__class__.__name__ + '.pkl')
+    include_infos = isinstance(env, InfoFilter)
 
     rollout.rollout_and_save(
         path=path,
@@ -125,7 +126,8 @@ def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedRandomA
         sample_until=rollout.make_sample_until(
             min_timesteps=min_timesteps,
             min_episodes=min_episodes,
-        )
+        ),
+        exclude_infos=not include_infos,
     )
 
 if __name__ == '__main__':
