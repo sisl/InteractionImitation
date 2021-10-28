@@ -5,10 +5,9 @@
 from src.discriminator import CnnDiscriminator, CnnDiscriminatorFlatAction
 from imitation.algorithms import adversarial
 import stable_baselines3
-from stable_baselines3.common.evaluation import evaluate_policy
 import torch.utils.data
 import numpy as np
-from intersim.envs.intersimple import Intersimple, NRasterized, NRasterizedInfo, NRasterizedIncrementingAgent, NRasterizedRandomAgent, speed_reward
+from intersim.envs.intersimple import NRasterized, NRasterizedRandomAgent, speed_reward
 import itertools
 import functools
 from torch.distributions import Categorical
