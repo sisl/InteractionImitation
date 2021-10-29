@@ -24,11 +24,19 @@ from src.gail.options import OptionsEnv, LLOptions, HLOptions, RenderOptions
 from src.gail.train import train_discriminator, train_generator
 
 model_name = 'gail_options_image_random_location'
-env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'map_color': 128}
+env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'map_color': 128, 'mu': 0.001}
 
 ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is safe fallback
 
-def train(expert_data, epochs=100, expert_batch_size=64, generator_steps=1024, discount=0.99):
+def train(
+        expert_data,
+        epochs=200,
+        expert_batch_size=256,
+        generator_steps=1024,
+        discount=0.99,
+        n_disc_updates_per_round=2,
+        n_gen_updates_per_round=10,
+    ):
     env = NRasterizedRouteRandomAgentLocation(**env_settings)
     env.discount = discount
 
@@ -52,6 +60,7 @@ def train(expert_data, epochs=100, expert_batch_size=64, generator_steps=1024, d
         OptionsEnv(env, options=ALL_OPTIONS),
         verbose=1,
         n_steps=generator_steps,
+        n_epochs=n_gen_updates_per_round,
     )
 
     # PPO.train requires logger as set up in
@@ -62,7 +71,7 @@ def train(expert_data, epochs=100, expert_batch_size=64, generator_steps=1024, d
     )
 
     for _ in tqdm(range(epochs)):
-        train_discriminator(LLOptions(env, options=ALL_OPTIONS), generator, discriminator, num_samples=expert_batch_size)
+        train_discriminator(LLOptions(env, options=ALL_OPTIONS), generator, discriminator, num_samples=expert_batch_size, n_updates=n_disc_updates_per_round)
         train_generator(HLOptions(env, options=ALL_OPTIONS), generator, discriminator, num_samples=generator_steps)
         generator.save(model_name)
     
