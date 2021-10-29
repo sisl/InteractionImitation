@@ -22,8 +22,8 @@ def train_generator(env, generator, discriminator, num_samples):
     for s in generator_samples[:-1]:
         generator.rollout_buffer.add(
             obs=s['obs'],
-            action=s['action'].cpu(),
-            reward=s['reward'].cpu(),
+            action=s['action'],
+            reward=s['reward'],
             episode_start=s['episode_start'],
             value=s['value'],
             log_prob=s['log_prob'],

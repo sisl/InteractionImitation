@@ -101,7 +101,7 @@ class HLOptions(OptionsEnv):
         self.steps = 0
 
     def _after_step(self):
-        self.r += self.discount**self.steps * self.discriminator.discrim_net.reward_train(
+        self.r += self.discount**self.steps * self.discriminator.discrim_net.predict_reward_train(
             state=torch.tensor(self.s).unsqueeze(0).to(self.discriminator.discrim_net.device()),
             action=torch.tensor([[self.a]]).to(self.discriminator.discrim_net.device()),
             next_state=torch.tensor(self.s).unsqueeze(0).to(self.discriminator.discrim_net.device()), # unused
@@ -112,8 +112,8 @@ class HLOptions(OptionsEnv):
     def _transitions(self):
         yield {
             'obs': self.obs,
-            'action': self.ch,
-            'reward': self.r.detach(),
+            'action': self.ch.cpu(),
+            'reward': self.r,
             'episode_start': self.episode_start,
             'value': self.value.detach(),
             'log_prob': self.log_prob.detach(),
