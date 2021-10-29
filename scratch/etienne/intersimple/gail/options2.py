@@ -2,13 +2,22 @@ import gym
 import torch
 from src.util.collisions import feasible
 import numpy as np
+from collections import deque
+import itertools
+
+def imitation_discriminator(discriminator):
+    return lambda obs, action, next_obs, done: discriminator.discrim_net.predict_reward_train(
+        state=torch.tensor(obs).unsqueeze(0).to(discriminator.discrim_net.device()),
+        action=torch.tensor([[action]]).to(discriminator.discrim_net.device()),
+        next_state=torch.tensor(next_obs).unsqueeze(0).to(discriminator.discrim_net.device()), # unused
+        done=torch.tensor(done).unsqueeze(0).to(discriminator.discrim_net.device()), # unused
+    ).item()
 
 class OptionsEnv(gym.Wrapper):
-    
-    def __init__(self, env, options=[(0, 5), (5, 5), (10, 5)], *args, **kwargs):
-        """option 0 is treated as safe fallback"""
 
+    def __init__(self, env, options, discriminator, ll_buffer_capacity, *args, **kwargs):
         super().__init__(env, *args, **kwargs)
+
         self.options = options
         num_hl_options = len(self.options)
         self.action_space = gym.spaces.Discrete(num_hl_options)
@@ -17,118 +26,72 @@ class OptionsEnv(gym.Wrapper):
             'mask': gym.spaces.Box(low=0, high=1, shape=(num_hl_options,)),
         })
 
-    def _after_choice(self):
-        pass
+        self.discriminator = discriminator
+        self.ll_buffer_capacity = ll_buffer_capacity
+        self.ll_buffer = deque(maxlen=ll_buffer_capacity)
     
-    def _after_step(self):
-        pass
-
-    def _transitions(self):
-        raise NotImplementedError('Use `LLOptions` or `HLOptions` for sampling.')
-    
-    def sample(self, generator):
-        self.done = True
-        while True:
-            self.episode_start = False
-            if self.done:
-                self.s = self.env.reset()
-                self.done = False
-                self.episode_start = True
-
-            self.m = available_actions(self.env, self.options)
-            if not self.m.any():
-                # action 0 is considered safe fallback
-                self.m[0] = True
-            
-            self.ch, self.value, self.log_prob = generator.policy.forward({
-                'obs': torch.tensor(self.s).unsqueeze(0).to(generator.policy.device),
-                'mask': self.m.unsqueeze(0).to(generator.policy.device),
-            })
-            self.plan = list(map(float, generate_plan(self.env, self.ch, self.options)))
-
-            self._after_choice()
-
-            assert not self.done
-            assert self.plan
-            #assert feasible(self.env, self.plan, self.ch)
-
-            while not self.done and self.plan and \
-                (feasible(self.env, safety_plan(self.env, self.plan)) or self.m.sum() == 1):
-                
-                self.a, self.plan = self.plan[0], self.plan[1:]
-                self.a = self.env._normalize(self.a)
-                self.nexts, _, self.done, _ = self.env.step(self.a)
-
-                self._after_step()
-
-                self.s = self.nexts
-            
-            yield from self._transitions()
-
-class LLOptions(OptionsEnv):
-    """Sample low-level (state, action) tuples for discriminator training."""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.observation_space = self.observation_space['obs']
-
-    def _after_choice(self):
-        self._transition_buffer = []
-
-    def _after_step(self):
-        self._transition_buffer.append({
-            'obs': self.s,
-            'next_obs': self.nexts,
-            'acts': np.array((self.a,)),
-            'dones': np.array(self.done),
-        })
-
-    def _transitions(self):
-        yield from self._transition_buffer
-    
-    def sample_ll(self, policy):
-        return self.sample(policy)
-
-class HLOptions(OptionsEnv):
-    """Sample high-level (state, action, reward) tuples for generator training."""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def _after_choice(self):
-        self.obs = {'obs': np.copy(self.s), 'mask': np.copy(self.m)}
-        self.r = 0
-        self.steps = 0
-
-    def _after_step(self):
-        self.r += self.discount**self.steps * self.discriminator.discrim_net.predict_reward_train(
-            state=torch.tensor(self.s).unsqueeze(0).to(self.discriminator.discrim_net.device()),
-            action=torch.tensor([[self.a]]).to(self.discriminator.discrim_net.device()),
-            next_state=torch.tensor(self.s).unsqueeze(0).to(self.discriminator.discrim_net.device()), # unused
-            done=torch.tensor(self.done).unsqueeze(0).to(self.discriminator.discrim_net.device()), # unused
-        )
-        self.steps += 1
-    
-    def _transitions(self):
-        yield {
-            'obs': self.obs,
-            'action': self.ch.cpu(),
-            'reward': self.r,
-            'episode_start': self.episode_start,
-            'value': self.value.detach(),
-            'log_prob': self.log_prob.detach(),
-            'done': self.done,
+    @staticmethod
+    def _hl_observation(obs, mask):
+        return {
+            'obs': obs,
+            'mask': mask,
         }
     
-    def sample_hl(self, policy, discriminator):
-        self.discriminator = discriminator
-        return self.sample(policy)
+    def reset(self):
+        self.done = False
+        self.obs = self.env.reset()
+        self.m = available_actions(self.env, self.options)
+        return self._hl_observation(self.obs, self.m)
+    
+    def _ll_step(self, action):
+        return self.env.step(action)
+    
+    def step(self, action):
+        assert self.m[action]
+        assert not self.done
 
-class RenderOptions(LLOptions):
+        plan = list(map(float, generate_plan(self.env, action, self.options)))
+        reward = 0
+        steps = 0
 
-    def _after_step(self):
-        super()._after_step()
+        while not self.done and plan and \
+            (feasible(self.env, safety_plan(self.env, plan)) or self.m.sum() == 1):
+            
+            a, plan = plan[0], plan[1:]
+            a = self.env._normalize(a)
+
+            next_obs, _, self.done, info = self._ll_step(a)
+
+            reward += self.discount**steps * self.discriminator(self.obs, a, next_obs, self.done)
+
+            self.ll_buffer.append({
+                'obs': self.obs,
+                'next_obs': next_obs,
+                'acts': np.array((a,)),
+                'dones': np.array(self.done),
+            })
+
+            steps += 1
+            self.obs = next_obs
+
+        self.m = available_actions(self.env, self.options)
+
+        return self._hl_observation(self.obs, self.m), reward, self.done, info
+    
+    def sample_ll(self, n):
+        assert n <= self.ll_buffer_capacity, f'Sample size of {n} exceeds buffer capacity of {self.ll_buffer_capacity}'
+        assert n <= len(self.ll_buffer), f'Sample size of {n} exceeds buffer size of {len(self.ll_buffer)}'
+        return list(itertools.islice(self.ll_buffer, n))
+
+class RenderOptions(OptionsEnv):
+
+    def __init__(self, options, *args, **kwargs):
+        super().__init__(options, discriminator=lambda s, a, n, d: 0, ll_buffer_capacity=0, *args, **kwargs)
+
+    def _ll_step(self):
+        out = super()._ll_step()
         self.env.render()
+        return out
     
     def close(self, *args, **kwargs):
         self.env.close(*args, **kwargs)
@@ -137,7 +100,9 @@ def safety_plan(env, plan):
     return np.concatenate((plan, np.array(5 * [env._env._min_acc])), axis=0)
 
 def available_actions(env, options):
-    """Return mask of available actions given current `env` state."""
+    """Return mask of available actions given current `env` state.
+    Action 0 is considered safe fallback.
+    """
     plans = [generate_plan(env, i, options) for i, _ in enumerate(options)]
     # is emergency braking still possible?
     plans = list(map(lambda p: safety_plan(env, p), plans))
@@ -147,6 +112,9 @@ def available_actions(env, options):
     plans = np.stack(plans, axis=0)
     
     valid = feasible(env, plans)
+    if not valid.any():
+        valid[0] = True
+
     return valid
 
 def target_velocity_plan(current_v: float, target_v: float, t: int, dt: float):
