@@ -2,15 +2,13 @@ import torch
 import numpy as np
 from intersim.collisions import state_to_polygon
 
-def feasible(env, plan, ch, method='exact'):
-    """Check if input profile is feasible given current `env` state. Action `ch=0` is safe fallback."""
+def feasible(env, plan, method='exact'):
+    """Check if input profile is feasible given current `env` state."""
     # zero pad plan - Take (B, T) or (T,) np plan and convert it to (B, T, nv, 1) torch.Tensor
     plan = torch.tensor(plan)
     plan = plan.reshape(-1, plan.shape[-1])
     full_plan = torch.zeros(*plan.shape, env._env._nv, 1)
     full_plan[:, :, env._agent, 0] = plan
-
-    ch = torch.tensor(ch)
 
     # check_future_collisions_fast takes in B-list and outputs (B,) bool tensor
     if method=='circle':
@@ -22,7 +20,7 @@ def feasible(env, plan, ch, method='exact'):
     else:
         raise NotImplementedError('Invalid collision-checking method')
 
-    return valid | (ch == 0)
+    return valid
 
 def check_future_collisions_ncircles(env, actions, n_circles:int=2):
     """Checks whether `env._agent` would collide with other agents assuming `actions` as input.

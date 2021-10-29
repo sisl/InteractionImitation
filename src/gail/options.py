@@ -5,7 +5,7 @@ import numpy as np
 
 class OptionsEnv(gym.Wrapper):
     
-    def __init__(self, env, options=[(v,t) for v in [0,2,4,6,8] for t in [5]], *args, **kwargs):
+    def __init__(self, env, options=[(0, 5), (5, 5), (10, 5)], *args, **kwargs):
         """option 0 is treated as safe fallback"""
 
         super().__init__(env, *args, **kwargs)
@@ -36,9 +36,13 @@ class OptionsEnv(gym.Wrapper):
                 self.episode_start = True
 
             self.m = available_actions(self.env, self.options)
+            if not self.m.any():
+                # action 0 is considered safe fallback
+                self.m[0] = True
+            
             self.ch, self.value, self.log_prob = generator.policy.forward({
                 'obs': torch.tensor(self.s).unsqueeze(0).to(generator.policy.device),
-                'mask': torch.tensor(self.m).unsqueeze(0).to(generator.policy.device),
+                'mask': self.m.unsqueeze(0).to(generator.policy.device),
             })
             self.plan = list(map(float, generate_plan(self.env, self.ch, self.options)))
 
@@ -48,7 +52,9 @@ class OptionsEnv(gym.Wrapper):
             assert self.plan
             #assert feasible(self.env, self.plan, self.ch)
 
-            while not self.done and self.plan and feasible(self.env, self.plan, self.ch.to('cpu')):
+            while not self.done and self.plan and \
+                (feasible(self.env, safety_plan(self.env, self.plan)) or self.m.sum() == 1):
+                
                 self.a, self.plan = self.plan[0], self.plan[1:]
                 self.a = self.env._normalize(self.a)
                 self.nexts, _, self.done, _ = self.env.step(self.a)
@@ -127,14 +133,20 @@ class RenderOptions(LLOptions):
     def close(self, *args, **kwargs):
         self.env.close(*args, **kwargs)
 
+def safety_plan(env, plan):
+    return np.concatenate((plan, np.array(5 * [env._env._min_acc])), axis=0)
+
 def available_actions(env, options):
     """Return mask of available actions given current `env` state."""
-    plan_indices = list(range(len(options)))
-    plans = [generate_plan(env, i, options) for i in plan_indices]
+    plans = [generate_plan(env, i, options) for i, _ in enumerate(options)]
+    # is emergency braking still possible?
+    plans = list(map(lambda p: safety_plan(env, p), plans))
+
     T = max(len(p) for p in plans)
     plans = [np.pad(p, ((0, T-len(p)),), constant_values=np.nan) for p in plans]
     plans = np.stack(plans, axis=0)
-    valid = feasible(env, plans, plan_indices)
+    
+    valid = feasible(env, plans)
     return valid
 
 def target_velocity_plan(current_v: float, target_v: float, t: int, dt: float):
