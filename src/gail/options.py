@@ -48,7 +48,7 @@ class OptionsEnv(gym.Wrapper):
             assert self.plan
             #assert feasible(self.env, self.plan, self.ch)
 
-            while not self.done and self.plan and feasible(self.env, self.plan, self.ch):
+            while not self.done and self.plan and feasible(self.env, self.plan, self.ch.to('cpu')):
                 self.a, self.plan = self.plan[0], self.plan[1:]
                 self.a = self.env._normalize(self.a)
                 self.nexts, _, self.done, _ = self.env.step(self.a)
@@ -129,7 +129,12 @@ class RenderOptions(LLOptions):
 
 def available_actions(env, options):
     """Return mask of available actions given current `env` state."""
-    valid = np.array([feasible(env, generate_plan(env, i, options), i) for i in range(len(options))])
+    plan_indices = list(range(len(options)))
+    plans = [generate_plan(env, i, options) for i in plan_indices]
+    T = max(len(p) for p in plans)
+    plans = [np.pad(p, ((0, T-len(p)),), constant_values=np.nan) for p in plans]
+    plans = np.stack(plans, axis=0)
+    valid = feasible(env, plans, plan_indices)
     return valid
 
 def target_velocity_plan(current_v: float, target_v: float, t: int, dt: float):
