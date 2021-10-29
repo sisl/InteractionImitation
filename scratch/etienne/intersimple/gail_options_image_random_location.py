@@ -31,10 +31,10 @@ ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is sa
 def train(
         expert_data,
         epochs=200,
-        expert_batch_size=256,
+        expert_batch_size=1024,
         generator_steps=1024,
         discount=0.99,
-        n_disc_updates_per_round=2,
+        n_disc_updates_per_round=10,
         n_gen_updates_per_round=10,
     ):
     env = NRasterizedRouteSpeedRandomAgentLocation(**env_settings)
