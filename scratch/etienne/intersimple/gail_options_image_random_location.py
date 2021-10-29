@@ -7,7 +7,7 @@ from imitation.algorithms import adversarial
 import stable_baselines3
 import torch.utils.data
 import numpy as np
-from intersim.envs import NRasterizedRouteRandomAgentLocation
+from intersim.envs import NRasterizedRouteSpeedRandomAgentLocation
 import itertools
 from torch.distributions import Categorical
 import gym
@@ -37,7 +37,7 @@ def train(
         n_disc_updates_per_round=2,
         n_gen_updates_per_round=10,
     ):
-    env = NRasterizedRouteRandomAgentLocation(**env_settings)
+    env = NRasterizedRouteSpeedRandomAgentLocation(**env_settings)
     env.discount = discount
 
     tempdir = tempfile.TemporaryDirectory(prefix="quickstart")
@@ -45,7 +45,7 @@ def train(
     logger.configure(tempdir_path / "GAIL/")
     print(f"All Tensorboards and logging are being written inside {tempdir_path}/.")
 
-    venv = make_vec_env(NRasterizedRouteRandomAgentLocation, n_envs=1, env_kwargs=env_settings)
+    venv = make_vec_env(NRasterizedRouteSpeedRandomAgentLocation, n_envs=1, env_kwargs=env_settings)
     discriminator = adversarial.GAIL(
         expert_data=expert_data,
         expert_batch_size=expert_batch_size,
@@ -88,13 +88,13 @@ def video(model_name, env):
 def evaluate():
     video(
         model_name=model_name,
-        env=NRasterizedRouteRandomAgentLocation(**env_settings)
+        env=NRasterizedRouteSpeedRandomAgentLocation(**env_settings)
     )
 
 # %%
 if __name__ == '__main__':
 
-    with open("data/NormalizedIntersimpleExpertMu.001N100000_NRasterizedRouteRandomAgentLocationw70h70mppx1mapc128.pkl", "rb") as f:
+    with open("data/NormalizedIntersimpleExpertMu.001N10000_NRasterizedRouteSpeedRandomAgentLocationw70h70mppx1mapc128mu.001.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
     train(transitions)
