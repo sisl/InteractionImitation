@@ -1,12 +1,13 @@
-import stable_baselines3
+from stable_baselines3.common.policies import ActorCriticPolicy, ActorCriticCnnPolicy
 from torch.distributions import Categorical
 
-class OptionsCnnPolicy(stable_baselines3.common.policies.ActorCriticCnnPolicy):
+class OptionsCnnPolicy(ActorCriticPolicy):
     """
     Class for high-level options policy (generator)
     """
     def __init__(self, observation_space, *args, **kwargs):
-        super().__init__(observation_space['obs'], *args, **kwargs)
+        super().__init__(observation_space, *args, **kwargs)
+        self.cnn_policy = ActorCriticCnnPolicy(observation_space['obs'], *args, **kwargs)
 
     def _prior_distribution(self, s):
         """
@@ -17,9 +18,9 @@ class OptionsCnnPolicy(stable_baselines3.common.policies.ActorCriticCnnPolicy):
             values (torch.tensor): values from critic
             dist (torch.distributions): prior distribution over actions
         """
-        latent_pi, latent_vf, latent_sde = self._get_latent(s)
-        distribution = self._get_action_dist_from_latent(latent_pi, latent_sde)
-        values = self.value_net(latent_vf)
+        latent_pi, latent_vf, latent_sde = self.cnn_policy._get_latent(s)
+        distribution = self.cnn_policy._get_action_dist_from_latent(latent_pi, latent_sde)
+        values = self.cnn_policy.value_net(latent_vf)
         return values, distribution.distribution
 
     def forward(self, obs, eps=1e-6):
@@ -39,6 +40,10 @@ class OptionsCnnPolicy(stable_baselines3.common.policies.ActorCriticCnnPolicy):
         posterior = Categorical((prior.probs + eps) * m)
         ch = posterior.sample()
         return ch, values, posterior.log_prob(ch)
+    
+    def _predict(self, obs, deterministic=False):
+        action, _, _ = self.forward(obs)
+        return action
 
     def evaluate_actions(self, obs, ch, eps=1e-6):
         """

@@ -34,7 +34,6 @@ def train(
         epochs=200,
     ):
     env = NRasterizedRouteSpeedRandomAgentLocation(**env_settings)
-    env.discount = discount
 
     tempdir = tempfile.TemporaryDirectory(prefix="quickstart")
     tempdir_path = pathlib.Path(tempdir.name)
@@ -51,10 +50,12 @@ def train(
         gen_algo=stable_baselines3.PPO("CnnPolicy", venv), # unused
     )
 
-    options_env = TimeLimit(OptionsEnv(env,
-        discriminator=imitation_discriminator(discriminator),
+    options_env = TimeLimit(OptionsEnv(
+        env,
         options=ALL_OPTIONS,
-        ll_buffer_capacity=expert_batch_size
+        discriminator=imitation_discriminator(discriminator),
+        discount=discount,
+        ll_buffer_capacity=expert_batch_size,
     ), max_episode_steps=10)
     generator = stable_baselines3.PPO(
         OptionsCnnPolicy,
@@ -79,11 +80,15 @@ def train(
     return generator
 
 def video(model_name, env):
-    model = stable_baselines3.PPO.load(model_name)
     env = RenderOptions(env, options=ALL_OPTIONS)
-    for s in env.sample_ll(model):
-        if s['dones']:
-            break
+    model = stable_baselines3.PPO.load(model_name)
+
+    done = False
+    obs = env.reset()
+    while not done:
+        action, _ = model.predict(obs)
+        obs, _, done, _ = env.step(action)
+
     env.close(filestr='render/'+model_name)
 
 def evaluate():

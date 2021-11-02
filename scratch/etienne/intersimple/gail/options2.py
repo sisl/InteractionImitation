@@ -15,7 +15,7 @@ def imitation_discriminator(discriminator):
 
 class OptionsEnv(gym.Wrapper):
 
-    def __init__(self, env, options, discriminator, ll_buffer_capacity, *args, **kwargs):
+    def __init__(self, env, options, discriminator, discount, ll_buffer_capacity, *args, **kwargs):
         super().__init__(env, *args, **kwargs)
 
         self.options = options
@@ -27,6 +27,7 @@ class OptionsEnv(gym.Wrapper):
         })
 
         self.discriminator = discriminator
+        self.discount = discount
         self.ll_buffer_capacity = ll_buffer_capacity
         self.ll_buffer = deque(maxlen=ll_buffer_capacity)
     
@@ -85,11 +86,11 @@ class OptionsEnv(gym.Wrapper):
 
 class RenderOptions(OptionsEnv):
 
-    def __init__(self, options, *args, **kwargs):
-        super().__init__(options, discriminator=lambda s, a, n, d: 0, ll_buffer_capacity=0, *args, **kwargs)
+    def __init__(self, env, options, *args, **kwargs):
+        super().__init__(env, options, discriminator=lambda s, a, n, d: 0, discount=1, ll_buffer_capacity=0, *args, **kwargs)
 
-    def _ll_step(self):
-        out = super()._ll_step()
+    def _ll_step(self, action):
+        out = super()._ll_step(action)
         self.env.render()
         return out
     
