@@ -15,8 +15,8 @@ from stable_baselines3.common.env_util import make_vec_env
 from tqdm import tqdm
 from src.policies.options import OptionsCnnPolicy
 from src.gail.train import flatten_transitions
-
 from gail.options2 import OptionsEnv, RenderOptions, imitation_discriminator
+from gym.wrappers import TimeLimit
 
 model_name = 'gail_options_image_random_location'
 env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'map_color': 128, 'mu': 0.001}
@@ -51,7 +51,11 @@ def train(
         gen_algo=stable_baselines3.PPO("CnnPolicy", venv), # unused
     )
 
-    options_env = OptionsEnv(env, discriminator=imitation_discriminator(discriminator), options=ALL_OPTIONS, ll_buffer_capacity=expert_batch_size)
+    options_env = TimeLimit(OptionsEnv(env,
+        discriminator=imitation_discriminator(discriminator),
+        options=ALL_OPTIONS,
+        ll_buffer_capacity=expert_batch_size
+    ), max_episode_steps=10)
     generator = stable_baselines3.PPO(
         OptionsCnnPolicy,
         options_env,
