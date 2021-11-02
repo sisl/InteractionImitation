@@ -19,7 +19,7 @@ from gail.options2 import OptionsEnv, RenderOptions, imitation_discriminator
 from gym.wrappers import TimeLimit
 
 model_name = 'gail_options_image_random_location'
-env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'map_color': 128, 'mu': 0.001}
+env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'map_color': 128, 'mu': 0.001, 'random_skip': True}
 
 ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is safe fallback
 
@@ -56,7 +56,7 @@ def train(
         discriminator=imitation_discriminator(discriminator),
         discount=discount,
         ll_buffer_capacity=expert_batch_size,
-    ), max_episode_steps=10)
+    ), max_episode_steps=15)
     generator = stable_baselines3.PPO(
         OptionsCnnPolicy,
         options_env,
