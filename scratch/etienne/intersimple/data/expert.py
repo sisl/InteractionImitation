@@ -1,10 +1,11 @@
 from intersim.envs.intersimple import Intersimple, InfoFilter
 from stable_baselines3.common.policies import BasePolicy
 import gym
-import intersim.envs.intersimple
+from intersim.envs.intersimple import *
 import imitation.data.rollout as rollout
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from imitation.data.wrappers import RolloutInfoWrapper
+from gail.envs import NRasterizedRouteSpeedRandomAgentLocation
 
 class IntersimExpert(BasePolicy):
     
@@ -105,7 +106,7 @@ def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedRandomA
         python -m intersimple.expert <flags>
 
     """
-    Env = intersim.envs.intersimple.__dict__[env]
+    Env = globals()[env]
     Expert = globals()[expert]
 
     env = Env(**env_args)
