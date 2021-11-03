@@ -5,7 +5,7 @@ sys.path.append('../../../')
 from src.discriminator import CnnDiscriminatorFlatAction
 from imitation.algorithms import adversarial
 import stable_baselines3
-from intersim.envs import NRasterizedRouteSpeedRandomAgentLocation
+from gail.envs import NRasterizedRouteSpeedRandomAgentLocation
 import pickle
 import imitation.data.rollout as rollout
 import tempfile
