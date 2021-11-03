@@ -19,7 +19,7 @@ from gail.options2 import OptionsEnv, RenderOptions, imitation_discriminator
 from gym.wrappers import TimeLimit
 
 model_name = 'gail_options_image_random_location'
-env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'map_color': 128, 'mu': 0.001, 'random_skip': True}
+env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'map_color': 128, 'mu': 0.001, 'random_skip': True, 'skip_frames': 5}
 
 ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is safe fallback
 
@@ -100,7 +100,7 @@ def evaluate():
 # %%
 if __name__ == '__main__':
 
-    with open("data/NormalizedIntersimpleExpertMu.001N10000_NRasterizedRouteSpeedRandomAgentLocationw70h70mppx1mapc128mu.001.pkl", "rb") as f:
+    with open("data/NormalizedIntersimpleExpertMu.001N10000_NRasterizedRouteSpeedRandomAgentLocationw70h70mppx1mapc128mu.001skip5.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
     train(transitions)

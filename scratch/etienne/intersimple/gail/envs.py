@@ -29,6 +29,6 @@ class RasterizedSpeed:
         return obs
 
 class NRasterizedRouteSpeedRandomAgentLocation(RandomLocation, RandomAgent, RewardVisualization,
-        Reward, ImageObservationAnimation, RasterizedRoute, RasterizedSpeed, NObservations, RasterizedObservation,
+        Reward, ImageObservationAnimation, RasterizedRoute, NObservations, RasterizedSpeed, RasterizedObservation,
         NormalizedActionSpace, ActionVisualization, InteractionSimulatorMarkerViz, ImitationCompat, Intersimple):
     pass
