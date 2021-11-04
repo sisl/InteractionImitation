@@ -1,6 +1,7 @@
 import gym
+from gym.wrappers.time_limit import TimeLimit
 import numpy as np
-from intersim.envs.intersimple import RandomLocation, RandomAgent, RewardVisualization, Reward, \
+from intersim.envs.intersimple import NRasterizedRouteRandomAgentLocation, RandomLocation, RandomAgent, RewardVisualization, Reward, \
     ImageObservationAnimation, RasterizedRoute, NObservations, RasterizedObservation, \
     NormalizedActionSpace, ActionVisualization, InteractionSimulatorMarkerViz, ImitationCompat, Intersimple
 
@@ -32,3 +33,11 @@ class NRasterizedRouteSpeedRandomAgentLocation(RandomLocation, RandomAgent, Rewa
         Reward, ImageObservationAnimation, RasterizedRoute, NObservations, RasterizedSpeed, RasterizedObservation,
         NormalizedActionSpace, ActionVisualization, InteractionSimulatorMarkerViz, ImitationCompat, Intersimple):
     pass
+
+class NoBSTimeLimit(TimeLimit):
+
+    def __getattr__(self, name):
+        return getattr(self.env, name)
+
+def TLNRasterizedRouteRandomAgentLocation(max_episode_steps, *args, **kwargs):
+    return NoBSTimeLimit(NRasterizedRouteRandomAgentLocation(*args, **kwargs), max_episode_steps=max_episode_steps)

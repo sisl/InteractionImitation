@@ -2,10 +2,10 @@ from intersim.envs.intersimple import Intersimple, InfoFilter
 from stable_baselines3.common.policies import BasePolicy
 import gym
 from intersim.envs.intersimple import *
+from gail.envs import *
 import imitation.data.rollout as rollout
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from imitation.data.wrappers import RolloutInfoWrapper
-from gail.envs import NRasterizedRouteSpeedRandomAgentLocation
 
 class IntersimExpert(BasePolicy):
     
