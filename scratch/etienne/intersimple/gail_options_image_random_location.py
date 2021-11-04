@@ -5,13 +5,11 @@ sys.path.append('../../../')
 from src.discriminator import CnnDiscriminatorFlatAction
 from imitation.algorithms import adversarial
 import stable_baselines3
-from intersim.envs import NRasterizedRouteRandomAgentLocation
 import pickle
 import imitation.data.rollout as rollout
 import tempfile
 import pathlib
 from imitation.util import logger
-from stable_baselines3.common.env_util import make_vec_env
 from tqdm import tqdm
 from src.policies.options import OptionsCnnPolicy
 from src.gail.train import flatten_transitions
@@ -56,7 +54,7 @@ def train(
         options=ALL_OPTIONS,
         discriminator=imitation_discriminator(discriminator),
         discount=discount,
-        ll_buffer_capacity=expert_batch_size,
+        ll_buffer_capacity=generator_total_steps*10,
     )
     generator = stable_baselines3.PPO(
         OptionsCnnPolicy,
@@ -100,7 +98,7 @@ def evaluate():
 
 # %%
 if __name__ == '__main__':
-    with open("data/NormalizedIntersimpleExpertMu.001N10000_TLNRasterizedRouteRandomAgentLocationw70h70mppx1mu.001rskips50.pkl", "rb") as f:
+    with open("data/NormalizedIntersimpleExpertMu.001N100000_TLNRasterizedRouteRandomAgentLocationw70h70mppx1mu.001rskips50.pkl", "rb") as f:
         trajectories = pickle.load(f)
     transitions = rollout.flatten_trajectories(trajectories)
     train(transitions)
