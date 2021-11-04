@@ -3,7 +3,6 @@ import torch
 from src.util.collisions import feasible
 import numpy as np
 from collections import deque
-import itertools
 
 def imitation_discriminator(discriminator):
     return lambda obs, action, next_obs, done: discriminator.discrim_net.predict_reward_train(
@@ -82,7 +81,8 @@ class OptionsEnv(gym.Wrapper):
     def sample_ll(self, n):
         assert n <= self.ll_buffer_capacity, f'Sample size of {n} exceeds buffer capacity of {self.ll_buffer_capacity}'
         assert n <= len(self.ll_buffer), f'Sample size of {n} exceeds buffer size of {len(self.ll_buffer)}'
-        return list(itertools.islice(self.ll_buffer, n))
+        ind = np.random.randint(len(self.ll_buffer), size=n)
+        return list(self.ll_buffer[i] for i in ind)
 
 class RenderOptions(OptionsEnv):
 
