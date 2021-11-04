@@ -5,7 +5,7 @@ sys.path.append('../../../')
 from src.discriminator import CnnDiscriminatorFlatAction
 from imitation.algorithms import adversarial
 import stable_baselines3
-from gail.envs import NRasterizedRouteSpeedRandomAgentLocation
+from intersim.envs import NRasterizedRouteRandomAgentLocation
 import pickle
 import imitation.data.rollout as rollout
 import tempfile
@@ -19,7 +19,7 @@ from gail.options2 import OptionsEnv, RenderOptions, imitation_discriminator
 from gym.wrappers import TimeLimit
 
 model_name = 'gail_options_image_random_location'
-env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'map_color': 128, 'mu': 0.001, 'random_skip': True, 'skip_frames': 5}
+env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'mu': 0.001, 'random_skip': True}
 
 ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is safe fallback
 
@@ -33,14 +33,14 @@ def train(
         discount=0.99,
         epochs=100,
     ):
-    env = NRasterizedRouteSpeedRandomAgentLocation(**env_settings)
+    env = NRasterizedRouteRandomAgentLocation(**env_settings)
 
     tempdir = tempfile.TemporaryDirectory(prefix="quickstart")
     tempdir_path = pathlib.Path(tempdir.name)
     logger.configure(tempdir_path / "GAIL/")
     print(f"All Tensorboards and logging are being written inside {tempdir_path}/.")
 
-    venv = make_vec_env(NRasterizedRouteSpeedRandomAgentLocation, n_envs=1, env_kwargs=env_settings)
+    venv = make_vec_env(NRasterizedRouteRandomAgentLocation, n_envs=1, env_kwargs=env_settings)
     discriminator = adversarial.GAIL(
         expert_data=expert_data,
         expert_batch_size=expert_batch_size,
@@ -94,7 +94,7 @@ def video(model_name, env):
 def evaluate():
     video(
         model_name=model_name,
-        env=NRasterizedRouteSpeedRandomAgentLocation(**env_settings)
+        env=NRasterizedRouteRandomAgentLocation(**env_settings)
     )
 
 # %%
