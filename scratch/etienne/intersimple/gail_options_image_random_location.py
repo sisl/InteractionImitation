@@ -16,20 +16,31 @@ from src.gail.train import flatten_transitions
 from gail.options2 import OptionsEnv, RenderOptions, imitation_discriminator
 from gail.envs import TLNRasterizedRouteRandomAgentLocation
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
+import torch
 
 model_name = 'gail_options_image_random_location'
 env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'mu': 0.001, 'random_skip': True, 'max_episode_steps': 50}
 
-ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is safe fallback
+ALL_OPTIONS = [(v,t) for v in [0,2,5,10,25] for t in [5, 10, 20]] # option 0 is safe fallback
+
+class NoisyDiscriminator(CnnDiscriminatorFlatAction):
+
+    def __init__(self, *args, std=0.0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.std = std
+
+    def forward(self, state, action):
+        noise = self.std * torch.randn(*action.shape, device=action.device)
+        return super().forward(state, action + noise)
 
 def train(
         expert_data,
         expert_batch_size=2048,
-        discriminator_updates_per_round=10,
-        generator_steps=256,
+        discriminator_updates_per_round=20,
+        generator_steps=64,
         generator_total_steps=1024,
         generator_updates_per_round=10,
-        discount=0.99,
+        discount=1.0,
         epochs=100,
     ):
     env = TLNRasterizedRouteRandomAgentLocation(**env_settings)
@@ -43,7 +54,9 @@ def train(
     discriminator = adversarial.GAIL(
         expert_data=expert_data,
         expert_batch_size=expert_batch_size,
-        discrim_kwargs={'discrim_net': CnnDiscriminatorFlatAction(venv)},
+        discrim_kwargs={'discrim_net': NoisyDiscriminator(venv, std=0.5)},
+        disc_opt_cls=torch.optim.RMSprop,
+        disc_opt_kwargs={'lr': 0.003, 'weight_decay': 0.01},
         #discrim_kwargs={'discrim_net': CnnDiscriminator(venv)},
         venv=venv, # unused
         gen_algo=stable_baselines3.PPO("CnnPolicy", venv), # unused
@@ -62,6 +75,7 @@ def train(
         verbose=1,
         n_steps=generator_steps,
         n_epochs=generator_updates_per_round,
+        gamma=1.0,
     )
 
     for _ in tqdm(range(epochs)):
@@ -90,7 +104,7 @@ def video(model_name, env):
     env.close(filestr='render/'+model_name)
 
 def evaluate():
-    video_settings = { **env_settings, 'random_skip': False, 'max_episode_steps': 1000 }
+    video_settings = { **env_settings, 'random_skip': False, 'max_episode_steps': 200 }
     env = TLNRasterizedRouteRandomAgentLocation(**video_settings)
     env = RenderOptions(env, options=ALL_OPTIONS)
     video(
