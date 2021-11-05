@@ -19,7 +19,6 @@ from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 
 model_name = 'gail_options_image_random_location'
 env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'mu': 0.001, 'random_skip': True, 'max_episode_steps': 50}
-env = TLNRasterizedRouteRandomAgentLocation(**env_settings)
 
 ALL_OPTIONS = [(v,t) for v in [0,2,4,6,8] for t in [5, 10, 20]] # option 0 is safe fallback
 
@@ -33,6 +32,7 @@ def train(
         discount=0.99,
         epochs=100,
     ):
+    env = TLNRasterizedRouteRandomAgentLocation(**env_settings)
 
     tempdir = tempfile.TemporaryDirectory(prefix="quickstart")
     tempdir_path = pathlib.Path(tempdir.name)
@@ -79,7 +79,6 @@ def train(
     return generator
 
 def video(model_name, env):
-    env = RenderOptions(env, options=ALL_OPTIONS)
     model = stable_baselines3.PPO.load(model_name)
 
     done = False
@@ -91,6 +90,9 @@ def video(model_name, env):
     env.close(filestr='render/'+model_name)
 
 def evaluate():
+    video_settings = { **env_settings, 'random_skip': False, 'max_episode_steps': 1000 }
+    env = TLNRasterizedRouteRandomAgentLocation(**video_settings)
+    env = RenderOptions(env, options=ALL_OPTIONS)
     video(
         model_name=model_name,
         env=env

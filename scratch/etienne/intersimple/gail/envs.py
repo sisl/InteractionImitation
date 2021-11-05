@@ -34,10 +34,13 @@ class NRasterizedRouteSpeedRandomAgentLocation(RandomLocation, RandomAgent, Rewa
         NormalizedActionSpace, ActionVisualization, InteractionSimulatorMarkerViz, ImitationCompat, Intersimple):
     pass
 
-class NoBSTimeLimit(TimeLimit):
+class TransparentTimeLimit(TimeLimit):
 
     def __getattr__(self, name):
         return getattr(self.env, name)
+    
+    def close(self, *args, **kwargs):
+        return self.env.close(*args, **kwargs)
 
 def TLNRasterizedRouteRandomAgentLocation(max_episode_steps, *args, **kwargs):
-    return NoBSTimeLimit(NRasterizedRouteRandomAgentLocation(*args, **kwargs), max_episode_steps=max_episode_steps)
+    return TransparentTimeLimit(NRasterizedRouteRandomAgentLocation(*args, **kwargs), max_episode_steps=max_episode_steps)

@@ -91,7 +91,7 @@ class RenderOptions(OptionsEnv):
 
     def _ll_step(self, action):
         out = super()._ll_step(action)
-        self.env.render()
+        self.env.render(mode='post')
         return out
     
     def close(self, *args, **kwargs):
