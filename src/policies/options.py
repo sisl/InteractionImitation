@@ -5,9 +5,10 @@ class OptionsCnnPolicy(ActorCriticPolicy):
     """
     Class for high-level options policy (generator)
     """
-    def __init__(self, observation_space, *args, **kwargs):
+    def __init__(self, observation_space, *args, eps=0, **kwargs):
         super().__init__(observation_space, *args, **kwargs)
         self.cnn_policy = ActorCriticCnnPolicy(observation_space['obs'], *args, **kwargs)
+        self.eps = eps
 
     def _prior_distribution(self, s):
         """
@@ -23,7 +24,7 @@ class OptionsCnnPolicy(ActorCriticPolicy):
         values = self.cnn_policy.value_net(latent_vf)
         return values, distribution.distribution
 
-    def forward(self, obs, eps=1e-6):
+    def forward(self, obs):
         """
         Will mask invalid states before making action selections
         Args:
@@ -37,7 +38,7 @@ class OptionsCnnPolicy(ActorCriticPolicy):
         """
         s, m = obs['obs'], obs['mask']
         values, prior = self._prior_distribution(s)
-        posterior = Categorical((prior.probs + eps) * m)
+        posterior = Categorical((prior.probs + self.eps) * m)
         ch = posterior.sample()
         return ch, values, posterior.log_prob(ch)
     
@@ -45,7 +46,7 @@ class OptionsCnnPolicy(ActorCriticPolicy):
         action, _, _ = self.forward(obs)
         return action
 
-    def evaluate_actions(self, obs, ch, eps=1e-6):
+    def evaluate_actions(self, obs, ch):
         """
         Evaluate particular actions
         Args:
@@ -60,5 +61,5 @@ class OptionsCnnPolicy(ActorCriticPolicy):
         """
         s, m = obs['obs'], obs['mask']
         values, prior = self._prior_distribution(s)
-        posterior = Categorical((prior.probs + eps) * m)
+        posterior = Categorical((prior.probs + self.eps) * m)
         return values, posterior.log_prob(ch), posterior.entropy() # additional values used by PPO.train
