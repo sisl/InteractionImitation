@@ -1,8 +1,9 @@
 # %%
+from collections import deque
 import sys
 sys.path.append('../../../')
 
-from src.discriminator import CnnDiscriminatorFlatAction
+from src.discriminator import CnnDiscriminator, CnnDiscriminatorFlatAction
 from imitation.algorithms import adversarial
 import stable_baselines3
 import pickle
@@ -16,12 +17,14 @@ from src.gail.train import flatten_transitions
 from gail.options2 import OptionsEnv, RenderOptions, imitation_discriminator
 from gail.envs import TLNRasterizedRouteRandomAgentLocation
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
+from stable_baselines3.common.env_util import make_vec_env
 import torch
+import numpy as np
 
 model_name = 'gail_options_image_random_location'
-env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'mu': 0.001, 'random_skip': True, 'max_episode_steps': 50}
+env_settings = {'width': 70, 'height': 70, 'm_per_px': 1, 'mu': 0.001, 'random_skip': True, 'max_episode_steps': 200}
 
-ALL_OPTIONS = [(v,t) for v in [0,2,5,10,25] for t in [5, 10, 20]] # option 0 is safe fallback
+ALL_OPTIONS = [(v,t) for v in [0,2,4,8,10] for t in [5, 10, 20]] # option 0 is safe fallback
 
 class NoisyDiscriminator(CnnDiscriminatorFlatAction):
 
@@ -33,15 +36,24 @@ class NoisyDiscriminator(CnnDiscriminatorFlatAction):
         noise = self.std * torch.randn(*action.shape, device=action.device)
         return super().forward(state, action + noise)
 
+class LLBuffer(deque):
+
+    def sample(self, n):
+        assert n <= self.maxlen, f'Sample size of {n} exceeds buffer capacity of {self.maxlen}'
+        assert n <= len(self), f'Sample size of {n} exceeds buffer size of {len(self)}'
+        ind = np.random.randint(len(self), size=n)
+        return list(self[i] for i in ind)
+
 def train(
         expert_data,
-        expert_batch_size=2048,
+        expert_batch_size=3072,
         discriminator_updates_per_round=20,
-        generator_steps=64,
-        generator_total_steps=1024,
+        generator_steps=1024,
+        generator_batch_size=1024,
+        generator_total_steps=4096,
         generator_updates_per_round=10,
         discount=1.0,
-        epochs=100,
+        epochs=200,
     ):
     env = TLNRasterizedRouteRandomAgentLocation(**env_settings)
 
@@ -54,37 +66,49 @@ def train(
     discriminator = adversarial.GAIL(
         expert_data=expert_data,
         expert_batch_size=expert_batch_size,
-        discrim_kwargs={'discrim_net': NoisyDiscriminator(venv, std=0.5)},
+        #discrim_kwargs={'discrim_net': NoisyDiscriminator(venv, std=0.25)},
         disc_opt_cls=torch.optim.RMSprop,
-        disc_opt_kwargs={'lr': 0.003, 'weight_decay': 0.01},
-        #discrim_kwargs={'discrim_net': CnnDiscriminator(venv)},
+        disc_opt_kwargs={'lr': 0.0001, 'weight_decay': 0.003},
+        discrim_kwargs={'discrim_net': CnnDiscriminator(venv)},
         venv=venv, # unused
         gen_algo=stable_baselines3.PPO("CnnPolicy", venv), # unused
     )
 
-    options_env = OptionsEnv(
-        env,
-        options=ALL_OPTIONS,
-        discriminator=imitation_discriminator(discriminator),
-        discount=discount,
-        ll_buffer_capacity=generator_total_steps*10,
+    ll_buffer = LLBuffer(maxlen=expert_batch_size*10)
+
+    options_env = make_vec_env(
+        OptionsEnv,
+        n_envs=1,
+        #vec_env_cls=SubprocVecEnv,
+        env_kwargs={
+            'env': env,
+            'options': ALL_OPTIONS,
+            'discriminator': imitation_discriminator(discriminator),
+            'discount': discount,
+            'll_buffer': ll_buffer,
+        }
     )
+
     generator = stable_baselines3.PPO(
         OptionsCnnPolicy,
         options_env,
         verbose=1,
+        batch_size=generator_batch_size,
         n_steps=generator_steps,
         n_epochs=generator_updates_per_round,
         gamma=1.0,
+        learning_rate=1e-4,
     )
 
     for _ in tqdm(range(epochs)):
+        ll_buffer.clear()
+
         # train generator
         generator.learn(total_timesteps=generator_total_steps)
 
         # train discriminator
         for _ in range(discriminator_updates_per_round):
-            generator_samples = options_env.sample_ll(expert_batch_size)
+            generator_samples = ll_buffer.sample(expert_batch_size)
             generator_samples = flatten_transitions(generator_samples)
             discriminator.train_disc(gen_samples=generator_samples)
 
