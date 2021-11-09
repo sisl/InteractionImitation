@@ -3,7 +3,7 @@ import intersim
 from src.gail.options import RenderOptions
 from tqdm import tqdm
 
-def render_env(model_name='gail_image_multiagent_nocollision', env='NRasterizedRoute', max_frames=600, options=False,
+def render_env(model_name='gail_image_multiagent_nocollision', env='NRasterizedRoute', max_frames=600, options=False, options_list=None,
     **env_kwargs):
     """
     Render a video from an model, agent, and environment
@@ -26,7 +26,8 @@ def render_env(model_name='gail_image_multiagent_nocollision', env='NRasterizedR
             if done:
                 break
     else:
-        env = RenderOptions(Env(**env_kwargs))
+        assert options_list, "No option list specified"
+        env = RenderOptions(Env(**env_kwargs), options=options_list)
         with tqdm(total=max_frames) as pbar:
             for i, s in enumerate(env.sample_ll(model)):
                 pbar.update(1)

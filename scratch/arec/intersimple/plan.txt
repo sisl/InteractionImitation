@@ -1,3 +1,8 @@
+Environment 
+-- each 'environment' follows a single roundabout and track id (recording of that roundabout)
+-- on reset, the environment we will use changes the vehicle to control while having the other agents follow their true data (expert controller)
+---- Note this can be problematic as it can lead to vehicles behind you crashing into you
+
 TRAINING
 ---------
 1. Load pre-trained massive set of transitions
@@ -10,7 +15,7 @@ TRAINING
 2. HGAIL
 -- For each epoch
     -- INSTANTIATE A NEW ENVIRONMENT (Roundabout + Track) w/ randomized agent, from set of all expert environments
-        -- Train discriminator off training data + yielded low-level transitions
+        -- Train discriminator off training data + yielded low-level transitions in replay buffer
         -- Train generator off yielded high-level transitions + summed low-level discriminator rewards
 
 TESTING
