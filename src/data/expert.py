@@ -117,7 +117,7 @@ def load_experts(expert_files):
     transitions = rollout.flatten_trajectories(trajectories)
     return transitions
 
-def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedIncrementingAgent', path=None, min_timesteps=None, min_episodes=None, video=False, env_args={}, policy_args={}):
+def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedRouteIncrementingAgent', path=None, min_timesteps=None, min_episodes=None, video=False, env_args={}, policy_args={}):
     """Rollout and save expert demos.
     
     Usage:
@@ -164,13 +164,13 @@ def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedIncreme
 def process_experts(filename:str='expert.pkl', 
                     locs:list=None, 
                     tracks:list=None,
-                    env_class:str='NRasterizedIncrementingAgent',
+                    env_class:str='NRasterizedRouteIncrementingAgent',
                     env_args:dict={'width':36,'height':36,'m_per_px':2},
                     expert_class:str='NormalizedIntersimpleExpert',  
                     expert_args:dict={'mu':0.001}):
     """
     Process all experts in the Interaction Dataset
-    For now, using NormalizedIntersimpleExpert with NRasterizedIncrementingAgent environment
+    For now, using NormalizedIntersimpleExpert with NRasterizedRouteIncrementingAgent environment
 
     Args:
         filename (str): name for track file
