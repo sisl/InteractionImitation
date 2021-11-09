@@ -1,1 +1,1 @@
-python -m render_options --model_name='gail_options_image_longlong_nocollision' --env='NRasterizedRoute' --options=True --width=36 --height=36 --m_per_px=2 --agent=50 --stop_on_collision=False
+python -m render_options --model_name='gail_options_image_mid_wcollision' --env='NRasterizedRoute' --options=True --width=36 --height=36 --m_per_px=2 --agent=50 --stop_on_collision=False
