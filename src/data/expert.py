@@ -1,3 +1,4 @@
+import intersim
 from intersim.envs.intersimple import Intersimple
 from stable_baselines3.common.policies import BasePolicy
 import gym
@@ -9,6 +10,7 @@ from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from imitation.data.wrappers import RolloutInfoWrapper
 import copy
 import os
+import numpy as np
 
 class IntersimExpert(BasePolicy):
     
@@ -100,24 +102,40 @@ def save_video(env, expert):
         env.render()
     env.close()
 
-def load_experts(expert_files):
+class NoShuffleRNG(np.random.RandomState):
+    """
+    A np.random.RandomState rng that doesn't shuffle inputs (for imitation.rollout)
+    """
+    def __init__(self):
+        super().__init__()
+
+    def shuffle(self, x):
+        return x
+
+def load_experts(expert_files, flatten = True):
     """
     Load expert trajectories from files and combine their transitions into a single RB
 
     Args:
         expert_files (list): list of expert file strings
+        flatten (bool): whether to flatten trajectory info
     Returns:
         transitions (list): list of combined expert episode transitions 
     """
-    trajectories = []
+    transitions = []
     for file in tqdm(expert_files):
         with open(file, "rb") as f:
             new_trajectories = pickle.load(f)
-        trajectories += new_trajectories
-    transitions = rollout.flatten_trajectories(trajectories)
+        transitions += new_trajectories
+    if flatten:
+        transitions = rollout.flatten_trajectories(transitions)
     return transitions
 
-def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedRouteIncrementingAgent', path=None, min_timesteps=None, min_episodes=None, video=False, env_args={}, policy_args={}):
+def single_agent_demonstrations(expert='NormalizedIntersimpleExpert', 
+                                env='NRasterizedRouteIncrementingAgent', 
+                                path=None, min_timesteps=None, 
+                                min_episodes=None, video=False,
+                                env_args={}, policy_args={}):
     """Rollout and save expert demos.
     
     Usage:
@@ -154,12 +172,38 @@ def demonstrations(expert='NormalizedIntersimpleExpert', env='NRasterizedRouteIn
             min_timesteps=min_timesteps,
             min_episodes=min_episodes,
         )
+    
     rollout.rollout_and_save(
         path=path,
         policy=venv_policy,
         venv=venv,
-        sample_until=suntil
+        sample_until=suntil,
+        rng=NoShuffleRNG()
     )
+
+def multi_agent_demonstrations(expert='IntersimExpert',path=None, env_args={}, policy_args={}):
+    """
+    Run and save the `intersim' multiagent environment demonstration
+    
+    Args: 
+        expert (class): class of multi-agent expert
+        path (str): path to store output data
+        env_args (dict): dictionary of kwargs when instantiating environment class
+        policy_args (dict): dictionary of kwargs when instantiating Expert policy
+    """
+    if path is None:
+        raise('No path specified')
+
+    env = gym.make('intersim:intersim-v0',**env_args)
+    Expert = globals()[expert] 
+    policy = Expert(env, **policy_args)
+
+    s, done = env.reset(), False
+    env.render(mode='file')
+    while not done:
+        _,_,done,_ = env.step(policy.predict()[0])
+        env.render(mode='file')
+    env.close(filestr=path)
 
 def process_experts(filename:str='expert.pkl', 
                     locs:list=None, 
@@ -190,22 +234,33 @@ def process_experts(filename:str='expert.pkl',
             iloc = intersim.LOCATIONS.index(loc)
 
             it_env_args = copy.deepcopy(env_args)
-            it_env_args.update({
+            env_loc_args = {
                 'loc':iloc,
                 'track':track,
-            })
+            }
+            it_env_args.update(env_loc_args)
             out_folder = os.path.join('expert_data',loc, 'track%04i'%(track))
             if not os.path.isdir(out_folder):
                 os.makedirs(out_folder) 
             it_path = os.path.join(out_folder,filename)
 
-            demonstrations(
+            # Multi-Agent demonstrations
+            it_ma_path = os.path.join(out_folder,'joint_expert')
+            multi_agent_demonstrations(
+                expert='IntersimExpert',
+                path=it_ma_path,
+                env_args=env_loc_args,
+                policy_args=expert_args
+            )
+            # Single-Agent POV Demonstrations
+            single_agent_demonstrations(
                 expert=expert_class, 
                 env=env_class, 
                 path=it_path, 
                 env_args=it_env_args, 
                 policy_args=expert_args,
                 )
+            
             pbar.update(1)
     pbar.close()
     
