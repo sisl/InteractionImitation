@@ -112,7 +112,7 @@ class NoShuffleRNG(np.random.RandomState):
     def shuffle(self, x):
         return x
 
-def load_experts(expert_files, flatten = True):
+def load_experts(expert_files, flatten=True):
     """
     Load expert trajectories from files and combine their transitions into a single RB
 
@@ -131,8 +131,27 @@ def load_experts(expert_files, flatten = True):
         transitions = rollout.flatten_trajectories(transitions)
     return transitions
 
-def single_agent_demonstrations(expert='NormalizedIntersimpleExpert', 
-                                env='NRasterizedRouteIncrementingAgent', 
+def single_agent_expert(expert='NormalizedIntersimpleExpert', 
+                        env='NRasterizedRouteIncrementingAgent', 
+                        env_args={}, policy_args={}, **kwargs):
+    """
+    Args: 
+        expert (class): class of expert
+        env (class): class of env intersim.envs.intersimple
+        env_args (dict): dictionary of kwargs when instantiating environment class
+        policy_args (dict): dictionary of kwargs when instantiating Expert policy
+        path (str): path to store output
+        min_timesteps (int): min number of timesteps for call to rollout.rollout_and_save
+        min_episodes (int): min number of episodes for call to rollout.rollout_and_save
+        video (bool): whether to save a video of the expert until a single environment instantiation stops
+    """
+    Env = intersim.envs.intersimple.__dict__[env]
+    Expert = globals()[expert]
+    env = Env(**env_args)
+    policy = Expert(env, **policy_args)
+    single_agent_demonstrations(env, policy, **kwargs)
+
+def single_agent_demonstrations(env, policy, 
                                 path=None, min_timesteps=None, 
                                 min_episodes=None, video=False,
                                 env_args={}, policy_args={}):
@@ -141,8 +160,8 @@ def single_agent_demonstrations(expert='NormalizedIntersimpleExpert',
     Usage:
         python -m intersimple.expert <flags>
     Args: 
-        expert (class): class of expert
-        env (class): class of env intersim.envs.intersimple
+        env (class): intersimple environment
+        policy (BasePolicy): intersimple policy
         path (str): path to store output
         min_timesteps (int): min number of timesteps for call to rollout.rollout_and_save
         min_episodes (int): min number of episodes for call to rollout.rollout_and_save
@@ -151,14 +170,8 @@ def single_agent_demonstrations(expert='NormalizedIntersimpleExpert',
         policy_args (dict): dictionary of kwargs when instantiating Expert policy
     """
     
-    Env = intersim.envs.intersimple.__dict__[env]
-    Expert = globals()[expert]
-
-    env = Env(**env_args)
     info_env = RolloutInfoWrapper(env) # getting rollout info (dictionary) from environment
     venv = DummyVecEnv([lambda: info_env]) # making a DummyVecEnv with a list of a function that when called returns the rollout info
-
-    policy = Expert(env, **policy_args) # instantiate an expert policy from specified class with instantiated environment and policy kwargs
     venv_policy = DummyVecEnvPolicy([lambda: policy]) # make a DummyVecEnvPolicy with a list of a function that when called returns the Expert policy
 
     if min_timesteps is None and min_episodes is None:
@@ -166,7 +179,7 @@ def single_agent_demonstrations(expert='NormalizedIntersimpleExpert',
 
     if video:
         save_video(env, policy)
-    
+
     path = path or (policy.__class__.__name__ + '_' + env.__class__.__name__ + '.pkl')
     suntil = rollout.make_sample_until(
             min_timesteps=min_timesteps,
@@ -253,7 +266,7 @@ def process_experts(filename:str='expert.pkl',
                 policy_args=expert_args
             )
             # Single-Agent POV Demonstrations
-            single_agent_demonstrations(
+            single_agent_expert(
                 expert=expert_class, 
                 env=env_class, 
                 path=it_path, 
