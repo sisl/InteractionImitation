@@ -5,12 +5,15 @@ import gym
 import intersim.envs.intersimple
 import pickle
 from tqdm import tqdm
-import imitation.data.rollout as rollout
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
-from imitation.data.wrappers import RolloutInfoWrapper
 import copy
 import os
 import numpy as np
+
+import imitation.data.rollout as rollout
+from imitation.data.wrappers import RolloutInfoWrapper
+
+from src.util.rollout import rollout_and_save, flatten_trajectories, make_sample_until
 
 class IntersimExpert(BasePolicy):
     
@@ -149,12 +152,13 @@ def single_agent_expert(expert='NormalizedIntersimpleExpert',
     Expert = globals()[expert]
     env = Env(**env_args)
     policy = Expert(env, **policy_args)
+    # single_agent_demonstrations_old(env, policy, **kwargs)
     single_agent_demonstrations(env, policy, **kwargs)
 
-def single_agent_demonstrations(env, policy, 
-                                path=None, min_timesteps=None, 
-                                min_episodes=None, video=False,
-                                env_args={}, policy_args={}):
+def single_agent_demonstrations_old(env, policy, 
+                                    path=None, min_timesteps=None, 
+                                    min_episodes=None, video=False,
+                                    env_args={}, policy_args={}):
     """Rollout and save expert demos.
     
     Usage:
@@ -182,9 +186,8 @@ def single_agent_demonstrations(env, policy,
 
     path = path or (policy.__class__.__name__ + '_' + env.__class__.__name__ + '.pkl')
     suntil = rollout.make_sample_until(
-            min_timesteps=min_timesteps,
-            min_episodes=min_episodes,
-        )
+        min_timesteps=min_timesteps, 
+        min_episodes=min_episodes)
     
     rollout.rollout_and_save(
         path=path,
@@ -192,6 +195,41 @@ def single_agent_demonstrations(env, policy,
         venv=venv,
         sample_until=suntil,
         rng=NoShuffleRNG()
+    )
+
+def single_agent_demonstrations(env, policy, 
+                                path=None, min_timesteps=None, 
+                                min_episodes=None, video=False,
+                                env_args={}, policy_args={}):
+    """Rollout and save expert demos.
+    
+    Usage:
+        python -m intersimple.expert <flags>
+    Args: 
+        env (class): intersimple environment
+        policy (BasePolicy): intersimple policy
+        path (str): path to store output
+        min_timesteps (int): min number of timesteps for call to rollout.rollout_and_save
+        min_episodes (int): min number of episodes for call to rollout.rollout_and_save
+        video (bool): whether to save a video of the expert until a single environment instantiation stops
+        env_args (dict): dictionary of kwargs when instantiating environment class
+        policy_args (dict): dictionary of kwargs when instantiating Expert policy
+    """
+    
+    if min_timesteps is None and min_episodes is None:
+        min_episodes = env.nv # one episode per vehicle being controlled in environment (hopefully an incrementing agent environment)
+
+    if video:
+        save_video(env, policy)
+
+    path = path or (policy.__class__.__name__ + '_' + env.__class__.__name__ + '.pkl')
+    suntil = make_sample_until(min_timesteps=min_timesteps,min_episodes=min_episodes)
+    
+    rollout_and_save(
+        path=path,
+        policy=policy,
+        env=env,
+        sample_until=suntil
     )
 
 def multi_agent_demonstrations(expert='IntersimExpert',path=None, env_args={}, policy_args={}):
