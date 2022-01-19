@@ -5,13 +5,9 @@ import gym
 import intersim.envs.intersimple
 import pickle
 from tqdm import tqdm
-from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 import copy
 import os
 import numpy as np
-
-import imitation.data.rollout as rollout
-from imitation.data.wrappers import RolloutInfoWrapper
 
 from src.util.rollout import rollout_and_save, flatten_trajectories, make_sample_until
 
@@ -72,29 +68,6 @@ class NormalizedIntersimpleExpert(IntersimpleExpert):
         action, _ = super().predict(*args, **kwargs)
         return self._intersimple._normalize(action), None
 
-class DummyVecEnvPolicy(BasePolicy):
-
-    def __init__(self, experts):
-        self._experts = [e() for e in experts]
-
-    def forward(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def _predict(self, *args, **kwargs):
-        raise NotImplementedError()
-    
-    def predict(self, *args, **kwargs):
-        predictions = [e.predict() for e in self._experts]
-        actions = [p[0] for p in predictions]
-        states = [p[1] for p in predictions]
-        return actions, states
-    
-    def forward(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def _predict(self, *args, **kwargs):
-        raise NotImplementedError()
-
 def save_video(env, expert):
     env.reset()
     env.render()
@@ -104,16 +77,6 @@ def save_video(env, expert):
         _, _, done, _ = env.step(actions)
         env.render()
     env.close()
-
-class NoShuffleRNG(np.random.RandomState):
-    """
-    A np.random.RandomState rng that doesn't shuffle inputs (for imitation.rollout)
-    """
-    def __init__(self):
-        super().__init__()
-
-    def shuffle(self, x):
-        return x
 
 def load_experts(expert_files, flatten=True):
     """
@@ -131,7 +94,7 @@ def load_experts(expert_files, flatten=True):
             new_trajectories = pickle.load(f)
         transitions += new_trajectories
     if flatten:
-        transitions = rollout.flatten_trajectories(transitions)
+        transitions = flatten_trajectories(transitions)
     return transitions
 
 def single_agent_expert(expert='NormalizedIntersimpleExpert', 
@@ -152,50 +115,7 @@ def single_agent_expert(expert='NormalizedIntersimpleExpert',
     Expert = globals()[expert]
     env = Env(**env_args)
     policy = Expert(env, **policy_args)
-    # single_agent_demonstrations_old(env, policy, **kwargs)
     single_agent_demonstrations(env, policy, **kwargs)
-
-def single_agent_demonstrations_old(env, policy, 
-                                    path=None, min_timesteps=None, 
-                                    min_episodes=None, video=False,
-                                    env_args={}, policy_args={}):
-    """Rollout and save expert demos.
-    
-    Usage:
-        python -m intersimple.expert <flags>
-    Args: 
-        env (class): intersimple environment
-        policy (BasePolicy): intersimple policy
-        path (str): path to store output
-        min_timesteps (int): min number of timesteps for call to rollout.rollout_and_save
-        min_episodes (int): min number of episodes for call to rollout.rollout_and_save
-        video (bool): whether to save a video of the expert until a single environment instantiation stops
-        env_args (dict): dictionary of kwargs when instantiating environment class
-        policy_args (dict): dictionary of kwargs when instantiating Expert policy
-    """
-    
-    info_env = RolloutInfoWrapper(env) # getting rollout info (dictionary) from environment
-    venv = DummyVecEnv([lambda: info_env]) # making a DummyVecEnv with a list of a function that when called returns the rollout info
-    venv_policy = DummyVecEnvPolicy([lambda: policy]) # make a DummyVecEnvPolicy with a list of a function that when called returns the Expert policy
-
-    if min_timesteps is None and min_episodes is None:
-        min_episodes = env.nv # one episode per vehicle being controlled in environment (hopefully an incrementing agent environment)
-
-    if video:
-        save_video(env, policy)
-
-    path = path or (policy.__class__.__name__ + '_' + env.__class__.__name__ + '.pkl')
-    suntil = rollout.make_sample_until(
-        min_timesteps=min_timesteps, 
-        min_episodes=min_episodes)
-    
-    rollout.rollout_and_save(
-        path=path,
-        policy=venv_policy,
-        venv=venv,
-        sample_until=suntil,
-        rng=NoShuffleRNG()
-    )
 
 def single_agent_demonstrations(env, policy, 
                                 path=None, min_timesteps=None, 

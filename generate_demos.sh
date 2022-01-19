@@ -7,4 +7,4 @@
 # expert_args:dict={mu:0.001}):
 
 # python -m src.data.expert --locs='[DR_USA_Roundabout_FT]' --tracks='[0]'
-python -m src.data.expert --locs='[DR_USA_Roundabout_FT]' --tracks='[0]' --filename='expert_new.pkl'
+python -m src.data.expert --locs='[DR_USA_Roundabout_FT]' --tracks='[0]'
