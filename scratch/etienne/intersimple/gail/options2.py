@@ -14,7 +14,7 @@ def imitation_discriminator(discriminator):
 
 class OptionsEnv(gym.Wrapper):
 
-    def __init__(self, env, options, discriminator, discount, ll_buffer_capacity, *args, **kwargs):
+    def __init__(self, env, options, discriminator, discount, ll_buffer, *args, **kwargs):
         super().__init__(env, *args, **kwargs)
 
         self.options = options
@@ -27,8 +27,7 @@ class OptionsEnv(gym.Wrapper):
 
         self.discriminator = discriminator
         self.discount = discount
-        self.ll_buffer_capacity = ll_buffer_capacity
-        self.ll_buffer = deque(maxlen=ll_buffer_capacity)
+        self.ll_buffer = ll_buffer
     
     @staticmethod
     def _hl_observation(obs, mask):
@@ -77,17 +76,11 @@ class OptionsEnv(gym.Wrapper):
         self.m = available_actions(self.env, self.options)
 
         return self._hl_observation(self.obs, self.m), reward, self.done, info
-    
-    def sample_ll(self, n):
-        assert n <= self.ll_buffer_capacity, f'Sample size of {n} exceeds buffer capacity of {self.ll_buffer_capacity}'
-        assert n <= len(self.ll_buffer), f'Sample size of {n} exceeds buffer size of {len(self.ll_buffer)}'
-        ind = np.random.randint(len(self.ll_buffer), size=n)
-        return list(self.ll_buffer[i] for i in ind)
 
 class RenderOptions(OptionsEnv):
 
     def __init__(self, env, options, *args, **kwargs):
-        super().__init__(env, options, discriminator=lambda s, a, n, d: 0, discount=1, ll_buffer_capacity=0, *args, **kwargs)
+        super().__init__(env, options, discriminator=lambda s, a, n, d: 0, discount=1, ll_buffer=deque(maxlen=0), *args, **kwargs)
 
     def _ll_step(self, action):
         out = super()._ll_step(action)
