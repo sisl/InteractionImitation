@@ -14,16 +14,14 @@ class CnnDiscriminator(torch.nn.Module):
         in_channels = obs_channels + action_size
 
         self.cnn = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels, 32, kernel_size=(8, 8), stride=(4, 4)), # 5+1 -> 32
+            torch.nn.Conv2d(in_channels, 4, kernel_size=8, stride=4, padding=0),
             torch.nn.ReLU(),
-            torch.nn.Conv2d(32, 64, kernel_size=(4, 4), stride=(2, 2)), # 32 -> 64
+            torch.nn.Conv2d(4, 8, kernel_size=4, stride=2, padding=0),
             torch.nn.ReLU(),
-            torch.nn.Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1)), # 64 -> 64
+            torch.nn.Flatten(start_dim=-3, end_dim=-1),
+            torch.nn.LazyLinear(512),
             torch.nn.ReLU(),
-            torch.nn.Flatten(start_dim=1, end_dim=-1),
-            torch.nn.LazyLinear(512), # 28224 -> 512
-            torch.nn.ReLU(),
-            torch.nn.LazyLinear(1), # 512 -> 1
+            torch.nn.LazyLinear(1),
         )
     
     @staticmethod
