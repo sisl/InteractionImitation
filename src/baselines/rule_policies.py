@@ -1,5 +1,6 @@
 from stable_baselines3.common.base_class import BaseAlgorithm
 from intersim.envs.intersimple import Intersimple
+from typing import Tuple, Optional
 import numpy as np
 
 class PControllerPolicy(BaseAlgorithm):
@@ -14,7 +15,7 @@ class PControllerPolicy(BaseAlgorithm):
         self.target_v = 8.94 # m/s
         self.attn_weight = 20
     
-    def predict(self, observation, *args, **kwargs):
+    def predict(self, observation: np.ndarray, *args, **kwargs):
         """
         Generate action, state from observation
 
@@ -58,15 +59,16 @@ class IDMRulePolicy(BaseAlgorithm):
     
     """
 
-    def __init__(self, env, target_speed: float= 8.94, t_future=0):
+    def __init__(self, env: Intersimple, target_speed: float= 8.94, t_future:float=0):
         """
         Initialize policy with pointer to environment it will run on and target speed
 
         Args:
             env (Intersimple): intersimple environment which IDM runs on
             target_speed (float): target speed in roundabout (default: 8.94=20 mph)
+            t_future (float): future time at which to compare closest
         """
-        assert(isinstance(env, Intersimple), 'Environment is not an intersimple environment')
+        # assert(isinstance(env, Intersimple), 'Environment is not an intersimple environment')
         self._env = env
 
         
@@ -82,8 +84,10 @@ class IDMRulePolicy(BaseAlgorithm):
         self.tau = 0.5 # desired time headway
         self.b_pref = 2.5 # preferred deceleration
         self.d_min = 1 #minimum spacing
+        super().__init__()
 
-    def predict(self, observation, *args, **kwargs):
+    def predict(self, observation:np.ndarray, 
+        *args, **kwargs) -> Tuple[np.ndarray,Optional[np.ndarray]]:
         """
         Generate action, state from observation
 
@@ -96,6 +100,8 @@ class IDMRulePolicy(BaseAlgorithm):
             action (np.ndarray): action for controlled agent to take
             state (np.ndarray): the index of the chosen vehicle for IDM
         """
+        import pdb
+        pdb.set_trace()
         agent = self._env._agent
         full_state = self._env._env.projected_state.numpy() #(nv, 5)
         ego_state = full_state[agent] # (5,)
@@ -125,7 +131,8 @@ class IDMRulePolicy(BaseAlgorithm):
         assert(action.shape==(1,))
         return action, i
     
-    def get_ego_dr(self, agent:int, xy: np.ndarray, v: np.ndarray, psi: np.ndarray):
+    def get_ego_dr(self, agent:int, xy: np.ndarray, 
+        v: np.ndarray, psi: np.ndarray) -> Tuple[Optional[np.ndarray], float, float]:
         """
         Return distance and relative speed of closest car within half angle from heading
         

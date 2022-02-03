@@ -2,9 +2,10 @@ import numpy as np
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.evaluation import evaluate_policy
 from intersim.envs.intersimple import Intersimple
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 import os
 import pickle
+from tqdm import tqdm
 
 class IntersimpleEvaluation:
     """
@@ -18,12 +19,13 @@ class IntersimpleEvaluation:
         - whether there was a collision
         - whether there was a hard brake
     """
-    def __init__(self, eval_env):
+    def __init__(self, eval_env, use_pbar:bool=True):
         """
         Initialize evaluation environment with an Intersimple IncrementingAgent environment
 
         Args:
             eval_env (Intersimple.IncrementingAgent): evaluation environment that increments agent upon reset
+            use_pbar (bool): whether to use a progress bar
         """
         # if env is a VecEnv, the code needs to be adapted, since the callback will be called after each step, 
         # so transitions of different envs will be mixed and the total number of episodes could be larger than n_eval_episodes!
@@ -34,6 +36,7 @@ class IntersimpleEvaluation:
 
         self.env = eval_env
         self.n_episodes = eval_env.nv
+        self.use_pbar = use_pbar
 
         # metrics present on every step of every episode
         self.metric_keys_all = ['v_all', 'a_all', 'col_all']
@@ -42,7 +45,7 @@ class IntersimpleEvaluation:
         self.metric_keys_single = ['j_all', 'v_avg','a_avg', 'col','brake', 't']
         
         # numbers for calculating metrics
-        self.hard_brake = -3 # acceleration for 'hard brake'
+        self.hard_brake = -3. # acceleration for 'hard brake'
 
         # reset metrics
         self.reset()
@@ -73,17 +76,18 @@ class IntersimpleEvaluation:
         with open(filestr, 'wb') as f:
             pickle.dump(self._metrics, f)     
 
-    def evaluate(self, policy, filestr: str) -> Dict[str, list]:
+    def evaluate(self, policy, filestr: Optional[str] = None) -> Dict[str, list]:
         """
         Evaluate a policy on the incrementing agent evaluation environment
         
         Args:
             policy (BaseClass.BaseAlgorithm): policy in which policy.predict(observation)[0] returns an action
-            filestr (str): path-like string to dump metrics to
+            filestr (str): path-like string to dump metrics to or None
         """
         self.reset()
-        metrics = {}
-        
+        if self.use_pbar:
+            self.pbar = tqdm(total=self.n_episodes)
+
         evaluate_policy(
             policy, 
             self.env,
@@ -91,8 +95,12 @@ class IntersimpleEvaluation:
             callback=self.evaluate_policy_callback, 
             return_episode_rewards=False
         )
+        if self.use_pbar:
+            self.pbar.close()
+            
         self.post_proc()
-        self.save(filestr)
+        if filestr:
+            self.save(filestr)
         return self._metrics
 
     def evaluate_policy_callback(self, local_vars, global_vars):
@@ -114,6 +122,9 @@ class IntersimpleEvaluation:
         if col:
             assert done
         self._metrics['col_all'][_agent].append(col)
+        
+        if done and self.use_pbar:
+            self.pbar.update(1)
     
     def post_proc(self):
         """
