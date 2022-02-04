@@ -6,6 +6,7 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from src.baselines import IDMRulePolicy
 from src.evaluation import IntersimpleEvaluation
 import src.options.envs as options_envs
+from src.evaluation.metrics import divergence, visualize_distribution
 
 from typing import Optional, List, Dict, Tuple
 import torch
@@ -186,7 +187,46 @@ def summary_metrics(metrics:List[Dict[str,list]]):
         metrics (list of dicts): policy_metrics[i][j][k] returns the value of metric 'j' 
             evaluated on the kth episode (car) of the ith roundabout trackfile under a policy
     """
-    pass
+    # keys = ['col_all','v_all', 'a_all','j_all', 'v_avg', 'a_avg', 'col', 'brake', 't']
+    import pdb
+    pdb.set_trace()
+
+    # average average-velocity
+    all_vavgs =  sum([d['v_avg'] for d in metrics],[]) # aggregate to single list
+    mean_vavg = sum(all_vavgs)/len(all_vavgs)
+    print(f'Mean Average Velocity: {mean_vavg}')
+
+    
+    all_aalls = np.concatenate([np.concatenate(d['a_all']) for d in metrics])
+    # average +acceleration
+    pos_accels = all_aalls[all_aalls>0]
+    mean_pos_accels = np.mean(pos_accels)
+    print(f'Mean positive acceleration: {mean_pos_accels}')
+
+    # average deceleration
+    decels = all_aalls[all_aalls<0]
+    mean_decels = np.mean(decels)
+    print(f'Mean positive acceleration: {mean_decels}')
+
+    # average |jerk|
+    all_jerks = np.concatenate([np.concatenate(d['j_all']) for d in metrics])
+    mean_abs_jerk = np.mean(np.abs(all_jerks))
+    print(f'Mean |Jerk|: {mean_abs_jerk}')
+
+    # collision rate
+    all_collisions =  sum([d['col'] for d in metrics],[]) # aggregate to single list
+    collision_rate = sum(all_collisions)/len(all_collisions)
+    print(f'Collision Rate: {collision_rate}')
+
+    # hard brake rate
+    all_hard_brakes =  sum([d['brake'] for d in metrics],[]) # aggregate to single list
+    hard_brake_rate = sum(all_hard_brakes)/len(all_hard_brakes)
+    print(f'Hard Brake Rate: {hard_brake_rate}')
+
+    # average number of timesteps
+    all_ts = sum([d['t'] for d in metrics],[]) # aggregate to single list
+    mean_t = sum(all_ts)/len(all_ts)
+    print(f'Mean episode length: {mean_t}')
 
 def comparison_metrics(policy_metrics:List[Dict[str,list]], expert_metrics:List[Dict[str,list]]):
     """
@@ -199,7 +239,36 @@ def comparison_metrics(policy_metrics:List[Dict[str,list]], expert_metrics:List[
             evaluated on the kth episode (car) of the ith expert roundabout trackfile
     
     """
-    pass
+    import pdb
+    pdb.set_trace()
+
+    # average velocity shortfall
+    expert_vavg = np.array(sum([d['v_avg'] for d in expert_metrics],[]))
+    policy_vavg = np.array(sum([d['v_avg'] for d in policy_metrics],[]))
+    assert(len(expert_vavg)==len(policy_vavg))
+    mean_shortfall = np.mean(expert_vavg - policy_vavg)
+    print(f'Mean shortfall velocity: {mean_shortfall}')
+    
+    # velocity JSD
+    expert_vs = np.concatenate([np.concatenate(d['v_all']) for d in expert_metrics])
+    policy_vs = np.concatenate([np.concatenate(d['v_all']) for d in policy_metrics])
+    vel_div = divergence(expert_vs, policy_vs)
+    print(f'Velocity distribution divergence: {vel_div}')
+    visualize_distribution(expert_vs, policy_vs, 'velocity_jsd.png')
+    
+    # acceleration JSD
+    expert_as = np.concatenate([np.concatenate(d['a_all']) for d in expert_metrics])
+    policy_as = np.concatenate([np.concatenate(d['a_all']) for d in policy_metrics])
+    accel_div = divergence(expert_as, policy_as)
+    print(f'Velocity distribution divergence: {accel_div}')
+    visualize_distribution(expert_as, policy_as, 'accel_jsd.png')
+    
+    # jerk JSD
+    expert_jerks = np.concatenate([np.concatenate(d['j_all']) for d in expert_metrics])
+    policy_jerks = np.concatenate([np.concatenate(d['j_all']) for d in policy_metrics])
+    jerk_div = divergence(expert_jerks, policy_jerks)
+    print(f'Jerk distribution divergence: {jerk_div}')
+    visualize_distribution(expert_jerks, policy_jerks, 'jerk_jsd.png')
 
 def test_model(
     locations: List[Tuple[int,int]]= [(0,0)],
