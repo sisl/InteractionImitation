@@ -1,7 +1,7 @@
 import numpy as np
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.evaluation import evaluate_policy
-from intersim.envs.intersimple import Intersimple
+from intersim.envs.intersimple import Intersimple, IncrementingAgent
 from typing import Callable, Dict, Optional
 import os
 import pickle
@@ -19,21 +19,18 @@ class IntersimpleEvaluation:
         - whether there was a collision
         - whether there was a hard brake
     """
-    def __init__(self, eval_env, use_pbar:bool=True):
+    def __init__(self, eval_env:IncrementingAgent, use_pbar:bool=True):
         """
         Initialize evaluation environment with an Intersimple IncrementingAgent environment
 
         Args:
-            eval_env (Intersimple.IncrementingAgent): evaluation environment that increments agent upon reset
+            eval_env (IncrementingAgent): evaluation environment that increments agent upon reset
             use_pbar (bool): whether to use a progress bar
         """
         # if env is a VecEnv, the code needs to be adapted, since the callback will be called after each step, 
         # so transitions of different envs will be mixed and the total number of episodes could be larger than n_eval_episodes!
         assert not isinstance(eval_env, VecEnv)
-        
-        # make sure we have specified an environment which increments the agent number on reset
-        assert isinstance(eval_env, Intersimple.IncrementingAgent)
-
+  
         self.env = eval_env
         self.n_episodes = eval_env.nv
         self.use_pbar = use_pbar
@@ -54,7 +51,7 @@ class IntersimpleEvaluation:
         """
         Reset metrics prior to evaluation
         """
-        self._metrics = {key: [[]]*self.n_episodes for key in self.metric_keys_all}
+        self._metrics = {key: [[] for _ in range(self.n_episodes)] for key in self.metric_keys_all}
         self._metrics.update({key: [None]*self.n_episodes for key in self.metric_keys_single})
     
     def save(self, filestr):
@@ -66,8 +63,8 @@ class IntersimpleEvaluation:
         """
         # assert metrics all have correct length
         for key in self.metric_keys:
-            assert(len(self._metrics[key])==self.n_episodes, 
-                f'_metrics[{key}] does not have length {self.n_episodes}')
+            assert len(self._metrics[key])==self.n_episodes, \
+                f'_metrics[{key}] does not have length {self.n_episodes}'
 
         # make filepath
         os.makedirs(os.path.dirname(filestr))
@@ -91,13 +88,13 @@ class IntersimpleEvaluation:
         evaluate_policy(
             policy, 
             self.env,
-            n_eval_episodes=self.n_eval_episodes,
+            n_eval_episodes=self.n_episodes,
             callback=self.evaluate_policy_callback, 
             return_episode_rewards=False
         )
         if self.use_pbar:
             self.pbar.close()
-            
+
         self.post_proc()
         if filestr:
             self.save(filestr)
@@ -119,6 +116,7 @@ class IntersimpleEvaluation:
         self._metrics['v_all'][_agent].append(info['prev_state'][_agent,2].item())
         self._metrics['a_all'][_agent].append(info['action_taken'][_agent,0].item())
         col = info['collision']
+
         if col:
             assert done
         self._metrics['col_all'][_agent].append(col)
@@ -138,7 +136,7 @@ class IntersimpleEvaluation:
             self._metrics['a_all'][i] = np.array(self._metrics['a_all'][i])
 
             # jerk
-            self._metrics['j_all'][i] = np.diff(self._metrics['a_all'][i]) / self.eval_env._env._dt
+            self._metrics['j_all'][i] = np.diff(self._metrics['a_all'][i]) / self.env._env._dt
 
             # average velocity and acceleration
             self._metrics['v_avg'][i] = np.mean(self._metrics['v_all'][i])

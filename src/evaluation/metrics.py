@@ -4,83 +4,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from intersim import collisions
+# import tikzplotlib 
 
-def metrics(filestr: str, test_dataset, policy):
-    """
-    Calculate metrics using a) base filestring to a simulation, and b) the test dataset and learned policy
-    Args:
-        filestr (str): base string to outputs of a simulation
-        test_dataset: a dataset held for testing
-        policy: policy
-    Returns:
-        info (dict): metrics in a dictionary
-    """
-    info = {}
-
-    # compute metrics using either
-    # a) simulation files that were saved under the trained policy with prefix 'policy'
-    # b) applying the policy to observations in the test dataset
-
-    # load simulated trajectory
-    states = torch.load(filestr + '_sim_states.pt').detach()
-    lengths = torch.load(filestr + '_sim_lengths.pt').detach()
-    widths = torch.load(filestr + '_sim_widths.pt').detach()
-    xpoly = torch.load(filestr + '_sim_xpoly.pt').detach()
-    ypoly = torch.load(filestr + '_sim_ypoly.pt').detach()
-
-    # count collisions (from function in intersim.collisions)
-    n_collisions = collisions.count_collisions_trajectory(states, lengths, widths)
-    info['n_collisions'] = n_collisions
-
-    # calculate average velocity
-    avg_v = average_velocity(states)
-    info['average_velocity'] = avg_v
-
-    # convert policy dtype between float32 and float64
-    policy.policy = policy.policy.type(test_dataset[0]['state']['ego_state'].dtype)
-    
-    # generate actions in test dataset
-    true_actions, pred_actions = [], []
-    true_velocities = []
-    test_loader = DataLoader(test_dataset, batch_size=1024)
-    with torch.no_grad():
-        for (batch_idx, batch) in enumerate(test_loader):
-            pred_actions.append(policy(batch['state']))
-            true_actions.append(batch['action'])
-            true_velocities.append(batch['state']['ego_state'][:,2])
-
-    true_actions, pred_actions = torch.cat(true_actions,dim=0), torch.cat(pred_actions, dim=0)
-    visualize_distribution(true_actions[:,0], pred_actions[:,0], filestr+'_action_viz') 
-
-    # calculate divergence between acceleration distributions
-    acceleration_divergence = divergence(pred_actions, true_actions, type='js')
-    info['acceleration_divergence'] = acceleration_divergence
-
-    # calculate divergence between velocity distributions
-    sim_velocities = states[:,:,2]
-    sim_velocities = sim_velocities[~torch.isnan(sim_velocities)].flatten()
-    true_velocities = torch.cat(true_velocities, dim=0)
-    velocity_divergence = divergence(sim_velocities, true_velocities, type='js')
-    info['velocity_divergence'] = velocity_divergence
-
-    return info
-
-
-def visualize_distribution(true, pred, filestr):
+def visualize_distribution(expert, policy, filestr):
     """
     Visualize two distributions
     Args:
-        true (torch.tensor): (n,)-sized true distribution
-        pred (torch.tensor): (m,)-sized pred distribution
+        expert (torch.tensor): (n,)-sized true distribution
+        generated (torch.tensor): (m,)-sized pred distribution
         filestr (str): string to save figure to
     """
-    nni1 = ~torch.isnan(true)
-    nni2 = ~torch.isnan(pred)
+    nni1 = ~torch.isnan(expert)
+    nni2 = ~torch.isnan(policy)
     plt.figure()
-    plt.hist(true[nni1].numpy(), density=True, bins=20)
-    plt.hist(pred[nni2].numpy(), density=True, bins=20)
-    plt.legend(['True', 'Predicted'])
+    plt.hist(expert[nni1].numpy(), density=True, bins=20)
+    plt.hist(policy[nni2].numpy(), density=True, bins=20)
+    plt.legend(['Expert', 'Predicted'])
     plt.savefig(filestr+'.png')
+    # tikzplotlib.save(filestr+'.tex')
     
 def average_velocity(states):
     """
