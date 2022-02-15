@@ -13,4 +13,4 @@ python -m src.eval_main
 # idm
 python -m src.eval_main --method=idm
 
-
+python -m src.eval_main --method=ogail --policy_file='checkpoints/gail-options-setobs2.pt' --env='NormalizedOptionsEvalEnv'

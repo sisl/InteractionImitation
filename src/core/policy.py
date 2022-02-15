@@ -15,8 +15,13 @@ class BasePolicy(nn.Module):
     def sample(self, dist):
         return self.torch_dist(dist).sample()
     
-    def predict(self, states):
-        return self.sample(self.forward(states))
+    def predict(self, observations, state=None, episode_start=None, deterministic=True):
+        observations = torch.tensor(observations)
+        if deterministic:
+            actions = self.forward(observations)[..., :self.action_dim]
+        else:
+            actions = self.sample(self.forward(observations))
+        return actions, None
 
     def log_prob(self, dist, actions):
         return self.torch_dist(dist).log_prob(actions)
@@ -58,6 +63,14 @@ class DiscretePolicy(BasePolicy):
     
     def torch_dist(self, dist):
         return Categorical(logits=dist)
+    
+    def predict(self, observations, state=None, episode_start=None, deterministic=True):
+        observations = torch.tensor(observations)
+        if deterministic:
+            _, actions = self.forward(observations).max(-1)
+        else:
+            actions = self.sample(self.forward(observations))
+        return actions, None
 
 class SetPolicy(Policy):
 

@@ -8,6 +8,9 @@ from src.baselines import IDMRulePolicy
 from src.evaluation import IntersimpleEvaluation
 import src.gail.options as options_envs
 from src.evaluation.metrics import divergence, visualize_distribution
+from src.core.policy import SetPolicy, SetDiscretePolicy
+from src.core.reparam_module import ReparamPolicy
+from src.gail2 import envs as options_envs2
 
 from typing import Optional, List, Dict, Tuple
 import torch
@@ -33,12 +36,31 @@ def load_policy(method:str,
     if method == 'idm':
         policy = IDMRulePolicy(env, **policy_kwargs)
     elif method == 'bc':
-        raise NotImplementedError
+        policy = SetPolicy(env.action_space.shape[-1])
+        policy.load_state_dict(torch.load(policy_file))
+        policy.eval()
     elif method == 'gail':
-        policy = sb3.PPO.load(policy_file)
-        raise NotImplementedError
+        policy = SetPolicy(env.action_space.shape[-1])
+        policy(torch.zeros(env.observation_space.shape))
+        policy = ReparamPolicy(policy)
+        policy.load_state_dict(torch.load(policy_file))
+        policy.eval()
+    elif method == 'gail-ppo':
+        policy = SetPolicy(env.action_space.shape[-1])
+        policy.load_state_dict(torch.load(policy_file))
+        policy.eval()
     elif method == 'rail':
         raise NotImplementedError
+    elif method == 'ogail':
+        policy = SetDiscretePolicy(env.action_space.n)
+        policy(torch.zeros(env.observation_space.shape))
+        policy = ReparamPolicy(policy)
+        policy.load_state_dict(torch.load(policy_file))
+        policy.eval()
+    elif method == 'ogail-ppo':
+        policy = SetDiscretePolicy(env.action_space.n)
+        policy.load_state_dict(torch.load(policy_file))
+        policy.eval()
     elif method == 'sgail':
         policy = sb3.PPO.load(policy_file)
         raise NotImplementedError
@@ -158,6 +180,7 @@ def evaluate_policy(locations:List[Tuple[int,int]],
     """
     envs_dict = dict(intersim.envs.intersimple.__dict__)
     envs_dict.update(dict(options_envs.__dict__))
+    envs_dict.update(dict(options_envs2.__dict__))
     policy_metrics = [None]* len(locations)
 
     # iterate through vehicles

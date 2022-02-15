@@ -1,6 +1,6 @@
 import gym
 import numpy as np
-from wrappers import Setobs, TransformObservation
+from src.gail2.wrappers import Wrapper, Setobs, TransformObservation
 from intersim.envs import IntersimpleLidarFlatIncrementingAgent
 
 obs_min = np.array([
@@ -30,7 +30,7 @@ def NormalizedOptionsEvalEnv(**kwargs):
         ), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
     ), options=[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5)])
 
-class OptionsEnv(gym.Wrapper):
+class OptionsEnv(Wrapper):
 
     def __init__(self, env, options):
         super().__init__(env)

@@ -6,6 +6,7 @@ from typing import Callable, Dict, Optional
 import os
 import pickle
 from tqdm import tqdm
+from src.gail2.envs import OptionsEnv
 
 class IntersimpleEvaluation:
     """
@@ -34,6 +35,7 @@ class IntersimpleEvaluation:
         self.env = eval_env
         self.n_episodes = eval_env.nv
         self.use_pbar = use_pbar
+        self.is_options_env = isinstance(self.env, OptionsEnv)
 
         # metrics present on every step of every episode
         self.metric_keys_all = ['v_all', 'a_all', 'col_all']
@@ -85,11 +87,14 @@ class IntersimpleEvaluation:
         if self.use_pbar:
             self.pbar = tqdm(total=self.n_episodes)
 
+        if self.is_options_env:
+            print('Evaluating an options environment')
+
         evaluate_policy(
             policy, 
             self.env,
             n_eval_episodes=self.n_episodes,
-            callback=self.evaluate_policy_callback, 
+            callback=self.evaluate_options_policy_callback if self.is_options_env else self.evaluate_policy_callback,
             return_episode_rewards=False
         )
         if self.use_pbar:
@@ -99,6 +104,13 @@ class IntersimpleEvaluation:
         if filestr:
             self.save(filestr)
         return self._metrics
+
+    def evaluate_options_policy_callback(self, local_vars, global_vars):
+        infos = local_vars['info']['ll']['infos']
+        dones = local_vars['info']['ll']['env_done']
+        agents = [info['agent'] for info in infos]
+        for info, done, agent in zip(infos, dones, agents):
+            self.eval_policy_step(info, done, agent)
 
     def evaluate_policy_callback(self, local_vars, global_vars):
         """
@@ -112,6 +124,9 @@ class IntersimpleEvaluation:
         env = local_vars['env'].envs[venv_i]
         assert isinstance(env, Intersimple)
 
+        self.eval_policy_step(info, done, _agent)
+
+    def eval_policy_step(self, info, done, _agent):
         # Increase collision counter if episode terminated with a collision
         self._metrics['v_all'][_agent].append(info['prev_state'][_agent,2].item())
         self._metrics['a_all'][_agent].append(info['action_taken'][_agent,0].item())
