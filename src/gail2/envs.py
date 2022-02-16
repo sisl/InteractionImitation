@@ -25,10 +25,17 @@ def NormalizedOptionsEvalEnv(**kwargs):
     return OptionsEnv(Setobs(
         TransformObservation(IntersimpleLidarFlatIncrementingAgent(
             n_rays=5,
-            stop_on_collision=False,
             **kwargs,
         ), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
     ), options=[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5)])
+
+def NormalizedContinuousEvalEnv(**kwargs):
+    return Setobs(
+        TransformObservation(IntersimpleLidarFlatIncrementingAgent(
+            n_rays=5,
+            **kwargs,
+        ), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
+    )
 
 class OptionsEnv(Wrapper):
 
@@ -65,7 +72,7 @@ class OptionsEnv(Wrapper):
             o, r, d, i = super().step(u)
             actions[k] = u
             rewards[k] = r
-            env_done[k+1] = d
+            env_done[k] = d
             infos.append(i)
             observations[k+1] = o
 
@@ -84,7 +91,7 @@ class OptionsEnv(Wrapper):
         ll_obs, ll_actions, ll_rewards, ll_env_done, ll_plan_done, ll_infos, ll_steps = self.execute_plan(self.last_obs, self.options[a], render_mode)
         hl_obs = ll_obs[ll_steps]
         hl_reward = (ll_rewards * ~ll_plan_done).sum().item()
-        hl_done = ll_env_done[ll_steps].item()
+        hl_done = ll_env_done[ll_steps-1].item()
         hl_infos = {
             'll': {
                 'observations': ll_obs,

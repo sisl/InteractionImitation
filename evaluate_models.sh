@@ -13,4 +13,11 @@ python -m src.eval_main
 # idm
 python -m src.eval_main --method=idm
 
-python -m src.eval_main --method=ogail --policy_file='checkpoints/gail-options-setobs2-15-02-2022.pt' --env='NormalizedOptionsEvalEnv'
+# options GAIL
+python -m src.eval_main --method=ogail --policy_file='checkpoints/gail-options-setobs2-Feb15_18-49-05.pt' --env='NormalizedOptionsEvalEnv' --env_kwargs='{stop_on_collision:True}'
+
+# options GAIL-PPO
+python -m src.eval_main --method=ogail-ppo --policy_file='checkpoints/gail-ppo-options-setobs2-Feb15_22-05-38.pt' --env='NormalizedOptionsEvalEnv' --env_kwargs='{stop_on_collision:True}'
+
+# behavior cloning
+python -m src.eval_main --method=bc --policy_file='checkpoints/bc-intersimple-setobs2.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}'

@@ -122,7 +122,7 @@ class IntersimpleEvaluation:
         done = local_vars['done']
         _agent = info['agent']
         env = local_vars['env'].envs[venv_i]
-        assert isinstance(env, Intersimple)
+        # assert isinstance(env, Intersimple)
 
         self.eval_policy_step(info, done, _agent)
 
