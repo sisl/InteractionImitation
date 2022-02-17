@@ -7,6 +7,7 @@ import os
 import pickle
 from tqdm import tqdm
 from src.options.envs import OptionsEnv
+from src.util.wrappers import OptionsTimeLimit
 
 class IntersimpleEvaluation:
     """
@@ -35,7 +36,7 @@ class IntersimpleEvaluation:
         self.env = eval_env
         self.n_episodes = eval_env.nv
         self.use_pbar = use_pbar
-        self.is_options_env = isinstance(self.env, OptionsEnv)
+        self.is_options_env = isinstance(self.env, (OptionsEnv, OptionsTimeLimit))
 
         # metrics present on every step of every episode
         self.metric_keys_all = ['v_all', 'a_all', 'col_all']

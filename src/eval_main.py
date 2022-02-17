@@ -11,6 +11,8 @@ from src.evaluation.metrics import divergence, visualize_distribution
 from src.core.policy import SetPolicy, SetDiscretePolicy
 from src.core.reparam_module import ReparamPolicy
 from src.options import envs as options_envs2
+from src.safe_options.policy import SetMaskedDiscretePolicy
+from src.safe_options import options as options_envs3
 
 from typing import Optional, List, Dict, Tuple
 import torch
@@ -62,8 +64,14 @@ def load_policy(method:str,
         policy.load_state_dict(torch.load(policy_file))
         policy.eval()
     elif method == 'sgail':
-        policy = sb3.PPO.load(policy_file)
-        raise NotImplementedError
+        policy = SetMaskedDiscretePolicy(env.action_space.n)
+        policy(
+            torch.zeros(env.observation_space['observation'].shape),
+            torch.zeros(env.observation_space['safe_actions'].shape)
+        )
+        policy = ReparamPolicy(policy)
+        policy.load_state_dict(torch.load(policy_file))
+        policy.eval()
     else:
         raise NotImplementedError
     return policy
@@ -181,6 +189,7 @@ def evaluate_policy(locations:List[Tuple[int,int]],
     envs_dict = dict(intersim.envs.intersimple.__dict__)
     envs_dict.update(dict(options_envs.__dict__))
     envs_dict.update(dict(options_envs2.__dict__))
+    envs_dict.update(dict(options_envs3.__dict__))
     policy_metrics = [None]* len(locations)
 
     # iterate through vehicles

@@ -1,10 +1,10 @@
 import torch
 import torch.nn.functional as F
 from dataclasses import dataclass
-from core.reparam_module import ReparamPolicy
-from core.sampling import rollout
-from core.trpo import trpo_step
-from core.ppo import ppo_step
+from src.core.reparam_module import ReparamPolicy
+from src.core.sampling import rollout
+from src.core.trpo import trpo_step
+from src.core.ppo import ppo_step
 from tqdm import tqdm
 
 class TerminalLogger:

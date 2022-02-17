@@ -3,14 +3,18 @@ import numpy as np
 import torch
 from stable_baselines3.common.vec_env import DummyVecEnv as VecEnv
 
-from core.reparam_module import ReparamPolicy
+from src.core.reparam_module import ReparamPolicy
 from tqdm import tqdm
-from core.gail import train_discriminator, roll_buffer, TerminalLogger
+from src.core.gail import train_discriminator, roll_buffer, TerminalLogger
 from dataclasses import dataclass
-from safe_options.policy_gradient import trpo_step, ppo_step
+from src.safe_options.policy_gradient import trpo_step, ppo_step
 import torch.nn.functional as F
 
-from safe_options.collisions import feasible
+from src.options.envs import OptionsEnv
+from src.safe_options.collisions import feasible
+
+from intersim.envs import IntersimpleLidarFlatIncrementingAgent
+from src.util.wrappers import OptionsTimeLimit, Setobs, TransformObservation
 
 @dataclass
 class Buffer:
@@ -156,81 +160,6 @@ def rollout(env_fn, policy, n_episodes, max_steps_per_episode):
 
     return (states, safe_actions, actions, rewards, dones), (ll_states, ll_actions, ll_rewards, ll_dones)
 
-class OptionsEnv(gym.Wrapper):
-
-    def __init__(self, env, options):
-        super().__init__(env)
-        self.ll_action_space = env.action_space
-        self.options = options
-        self.action_space = gym.spaces.Discrete(len(options))
-        self.max_plan_length = max(t for _, t in options)
-    
-    def plan(self, option):
-        target_v, t = option
-        current_v = self.env._env.state[self.env._agent, 1].item()
-        dt = self.env._env._dt
-        a = (target_v - current_v) / (t * dt)
-        a = self.env._normalize(a)
-        a = a * np.ones((t,))
-        a += 0.01 * np.random.randn(*a.shape)
-        a = np.clip(a, self.ll_action_space.low, self.ll_action_space.high)
-        return a
-
-    def execute_plan(self, obs, option, render_mode=None):
-        observations = np.zeros((self.max_plan_length + 1, *self.env.observation_space.shape))
-        actions = np.zeros((self.max_plan_length + 1, *self.ll_action_space.shape))
-        rewards = np.zeros((self.max_plan_length + 1,))
-        env_done = np.ones((self.max_plan_length + 1,), dtype=bool)
-        plan_done = np.ones((self.max_plan_length + 1,), dtype=bool)
-        infos = []
-
-        plan = self.plan(option)
-        observations[0] = obs
-        env_done[0] = False
-        for k, u in enumerate(plan):
-            plan_done[k] = False
-            o, r, d, i = self.env.step(u)
-            actions[k] = u
-            rewards[k] = r
-            env_done[k+1] = d
-            infos.append(i)
-            observations[k+1] = o
-
-            if render_mode is not None:
-                self.env.render(render_mode)
-
-            if d:
-                break
-        
-        n_steps = k + 1
-        return observations, actions, rewards, env_done, plan_done, infos, n_steps
-
-    def step(self, action, render_mode=None):
-        a = int(action)
-        assert a == action
-        ll_obs, ll_actions, ll_rewards, ll_env_done, ll_plan_done, ll_infos, ll_steps = self.execute_plan(self.last_obs, self.options[a], render_mode)
-        hl_obs = ll_obs[ll_steps]
-        hl_reward = (ll_rewards * ~ll_plan_done).sum().item()
-        hl_done = ll_env_done[ll_steps].item()
-        hl_infos = {
-            'll': {
-                'observations': ll_obs,
-                'actions': ll_actions,
-                'rewards': ll_rewards,
-                'env_done': ll_env_done,
-                'plan_done': ll_plan_done,
-                'infos': ll_infos,
-                'steps': ll_steps,
-            }
-        }
-        self.last_obs = hl_obs
-        return hl_obs, hl_reward, hl_done, hl_infos
-    
-    def reset(self, *args, **kwargs):
-        self.last_obs = super().reset(*args, **kwargs)
-        return self.last_obs
-
-
 class SafeOptionsEnv(OptionsEnv):
 
     def __init__(self, env, options, safe_actions_collision_method=None, abort_unsafe_collision_method=None):
@@ -287,7 +216,7 @@ class SafeOptionsEnv(OptionsEnv):
             o, r, d, i = self.env.step(u)
             actions[k] = u
             rewards[k] = r
-            env_done[k+1] = d
+            env_done[k] = d
             infos.append(i)
             observations[k+1] = o
 
@@ -303,3 +232,29 @@ class SafeOptionsEnv(OptionsEnv):
         
         n_steps = k + 1
         return observations, actions, rewards, env_done, plan_done, infos, n_steps
+
+obs_min = np.array([
+    [-1000, -1000, 0, -np.pi, -1e-1, 0.],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+]).reshape(-1)
+
+obs_max = np.array([
+    [1000, 1000, 20, np.pi, 1e-1, 0.],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+]).reshape(-1)
+
+def NormalizedSafeOptionsEvalEnv(max_episode_steps=float('inf'), safe_actions_collision_method=None, abort_unsafe_collision_method=None, **kwargs):
+    return OptionsTimeLimit(SafeOptionsEnv(Setobs(
+        TransformObservation(IntersimpleLidarFlatIncrementingAgent(
+            n_rays=5,
+            **kwargs,
+        ), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
+    ), options=[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5)], safe_actions_collision_method=safe_actions_collision_method, abort_unsafe_collision_method=abort_unsafe_collision_method), max_episode_steps=max_episode_steps)

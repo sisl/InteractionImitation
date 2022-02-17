@@ -1,6 +1,6 @@
 import torch
-from core.sampling import rollout
-from core.value_estimation import gae
+from src.core.sampling import rollout
+from src.core.value_estimation import gae
 
 def ppo(env_fn, value, policy, epochs, rollout_episodes, rollout_steps, gamma, gae_lambda, clip_ratio, pi_opt, pi_iters, v_opt, v_iters, target_kl=None, max_grad_norm=None):
 

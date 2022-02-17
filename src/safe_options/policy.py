@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 from torch.distributions.kl import kl_divergence
-from core.policy import SetDiscretePolicy
+from src.core.policy import SetDiscretePolicy
 
 class SetMaskedDiscretePolicy(SetDiscretePolicy):
 
@@ -20,6 +20,15 @@ class SetMaskedDiscretePolicy(SetDiscretePolicy):
         z = dist[..., self.action_dim:]
         a = super().torch_dist(logits).probs
         return (a * (1 - z)).sum(-1)
+    
+    def predict(self, observations, state=None, episode_start=None, deterministic=True):
+        observation = torch.tensor(observations['observation'])
+        safe_actions = torch.tensor(observations['safe_actions'])
+        if deterministic:
+            _, actions = self.forward(observation, safe_actions).max(-1)
+        else:
+            actions = self.sample(self.forward(observation, safe_actions))
+        return actions, None
     
     # def torch_dist_nomask(self, dist):
     #     print('no mask logprob')

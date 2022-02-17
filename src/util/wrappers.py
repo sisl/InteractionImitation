@@ -9,6 +9,10 @@ class TransformObservation(gym.wrappers.TransformObservation):
     def __getattr__(self, name):
         return getattr(self.env, name)
 
+class OptionsTimeLimit(gym.wrappers.TimeLimit):
+    def __getattr__(self, name):
+        return getattr(self.env, name)
+
 class CollisionPenaltyWrapper(Wrapper):
 
     def __init__(self, env, collision_distance, collision_penalty, *args, **kwargs):

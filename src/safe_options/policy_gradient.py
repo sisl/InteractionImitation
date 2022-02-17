@@ -1,6 +1,6 @@
 import torch
-from core.value_estimation import gae
-from core.optimization import conjugate_gradient, line_search
+from src.core.value_estimation import gae
+from src.core.optimization import conjugate_gradient, line_search
 
 def trpo_step(value, policy, states, safe_actions, actions, rewards, dones, gamma, gae_lambda, delta, backtrack_coeff, backtrack_iters, v_opt, v_iters, cg_iters=10, cg_damping=0.1):
 

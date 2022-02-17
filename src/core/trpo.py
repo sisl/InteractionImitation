@@ -1,8 +1,8 @@
 import torch
-from core.reparam_module import ReparamPolicy
-from core.sampling import rollout
-from core.value_estimation import gae
-from core.optimization import conjugate_gradient, line_search
+from src.core.reparam_module import ReparamPolicy
+from src.core.sampling import rollout
+from src.core.value_estimation import gae
+from src.core.optimization import conjugate_gradient, line_search
 
 def trpo(env_fn, value, policy, epochs, rollout_episodes, rollout_steps, gamma, gae_lambda, delta, backtrack_coeff, backtrack_iters, v_opt, v_iters, cg_iters=10, cg_damping=0.1):
 
