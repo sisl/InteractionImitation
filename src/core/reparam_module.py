@@ -160,3 +160,6 @@ class ReparamPolicy(ReparamModule):
     
     def predict(self, *args, **kwargs):
         return self.module.predict(*args, **kwargs)
+    
+    def unsafe_probability_mass(self, *args, **kwargs):
+        return self.module.unsafe_probability_mass(*args, **kwargs)
