@@ -6,7 +6,7 @@ from typing import Callable, Dict, Optional
 import os
 import pickle
 from tqdm import tqdm
-from src.gail2.envs import OptionsEnv
+from src.options.envs import OptionsEnv
 
 class IntersimpleEvaluation:
     """

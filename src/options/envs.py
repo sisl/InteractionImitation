@@ -1,6 +1,6 @@
 import gym
 import numpy as np
-from src.gail2.wrappers import Wrapper, Setobs, TransformObservation
+from src.util.wrappers import Wrapper, Setobs, TransformObservation
 from intersim.envs import IntersimpleLidarFlatIncrementingAgent
 
 obs_min = np.array([

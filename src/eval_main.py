@@ -10,7 +10,7 @@ import src.gail.options as options_envs
 from src.evaluation.metrics import divergence, visualize_distribution
 from src.core.policy import SetPolicy, SetDiscretePolicy
 from src.core.reparam_module import ReparamPolicy
-from src.gail2 import envs as options_envs2
+from src.options import envs as options_envs2
 
 from typing import Optional, List, Dict, Tuple
 import torch
