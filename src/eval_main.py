@@ -72,6 +72,10 @@ def load_policy(method:str,
         policy = ReparamPolicy(policy)
         policy.load_state_dict(torch.load(policy_file))
         policy.eval()
+    elif method == 'sgail-ppo':
+        policy = SetMaskedDiscretePolicy(env.action_space.n)
+        policy.load_state_dict(torch.load(policy_file))
+        policy.eval()
     else:
         raise NotImplementedError
     return policy
