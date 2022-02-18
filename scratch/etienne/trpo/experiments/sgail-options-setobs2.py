@@ -1,19 +1,22 @@
 # %%
+import sys
+sys.path.append('../../../../')
+
 import gym
-from safe_options.options import gail
-from core.gail import Buffer
-from core.value import SetValue
-from safe_options.policy import SetMaskedDiscretePolicy
-from core.discriminator import DeepsetDiscriminator
+from src.safe_options.options import gail
+from src.core.gail import Buffer
+from src.core.value import SetValue
+from src.safe_options.policy import SetMaskedDiscretePolicy
+from src.core.discriminator import DeepsetDiscriminator
 import torch.optim
 from intersim.envs import IntersimpleLidarFlatRandom
 from intersim.envs.intersimple import speed_reward
 import functools
-from util.wrappers import CollisionPenaltyWrapper, TransformObservation, Setobs
+from src.util.wrappers import CollisionPenaltyWrapper, TransformObservation, Setobs
 import numpy as np
-from safe_options.options import SafeOptionsEnv
+from src.safe_options.options import SafeOptionsEnv
 from torch.utils.tensorboard import SummaryWriter
-from core.reparam_module import ReparamPolicy
+from src.core.reparam_module import ReparamPolicy
 
 obs_min = np.array([
     [-1000, -1000, 0, -np.pi, -1e-1, 0.],
