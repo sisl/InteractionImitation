@@ -4,7 +4,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from intersim import collisions
+from typing import List
 # import tikzplotlib 
+
+def rwse(expert:List[np.ndarray], policy:List[np.ndarray], dt:float=0.1) -> float:
+    """
+    Calculated time-weighted 
+    
+    Args:
+        expert (List[np.ndarray]): all position trajectories for all expert rollouts
+        policy (List[np.ndarray]): all position trajectories for all policy rollouts
+
+    each trajectory in the list should have shape (2, T). however expert[i] might have a 
+    different T than policy[i]
+    
+    Returns
+        rwse (float): rwse of positions
+    """
+    assert len(expert) == len(policy)
+
+    # calculate rwse
+
+    return 0.0
+
+
 
 def visualize_distribution(expert, policy, filestr):
     """

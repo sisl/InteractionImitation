@@ -7,7 +7,7 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from src.baselines import IDMRulePolicy
 from src.evaluation import IntersimpleEvaluation
 import src.gail.options as options_envs
-from src.evaluation.metrics import divergence, visualize_distribution
+from src.evaluation.metrics import divergence, visualize_distribution, rwse
 from src.evaluation.utils import save_metrics
 from src.core.policy import SetPolicy, SetDiscretePolicy
 from src.core.reparam_module import ReparamPolicy
@@ -103,7 +103,7 @@ def form_expert_metrics(states:torch.Tensor, actions:torch.Tensor) ->Dict[str, l
     
     hard_brake = -3.
     timestep = 0.1
-    keys = ['col_all','v_all', 'a_all','j_all', 'v_avg', 'a_avg', 'col', 'brake', 't']
+    keys = ['col_all','x_all','y_all','v_all', 'a_all','j_all', 'v_avg', 'a_avg', 'col', 'brake', 't']
     metrics = {key:[None]*nv for key in keys}
     
     for i in range(nv):
@@ -111,6 +111,8 @@ def form_expert_metrics(states:torch.Tensor, actions:torch.Tensor) ->Dict[str, l
         nni = ~torch.isnan(states[:,i,0])
 
         metrics['col_all'][i] = [False] * sum(nni) 
+        metrics['x_all'][i] = states[nni,i,0].numpy()
+        metrics['y_all'][i] = states[nni,i,1].numpy()
         metrics['v_all'][i] = states[nni,i,2].numpy()
         metrics['a_all'][i] = actions[nni,i,0].numpy()
         
@@ -243,7 +245,7 @@ def summary_metrics(metrics:List[Dict[str,list]]) -> Dict[str,float]:
     
     # average acceleration
     all_aalls = np.concatenate([np.concatenate(d['a_all']) for d in metrics])
-    summary_metrics['mean acceleartion'] = np.mean(all_aalls)
+    summary_metrics['mean acceleration'] = np.mean(all_aalls)
 
     # average +acceleration
     pos_accels = all_aalls[all_aalls>0]
@@ -261,11 +263,11 @@ def summary_metrics(metrics:List[Dict[str,list]]) -> Dict[str,float]:
     summary_metrics['mean |jerk|'] = np.mean(np.abs(all_jerks))
 
     # collision rate
-    all_collisions =  sum([d['col'] for d in metrics],[]) # aggregate to single list
+    all_collisions = sum([d['col'] for d in metrics],[]) # aggregate to single list
     summary_metrics['collision rate'] = sum(all_collisions)/len(all_collisions)
 
     # hard brake rate
-    all_hard_brakes =  sum([d['brake'] for d in metrics],[]) # aggregate to single list
+    all_hard_brakes = sum([d['brake'] for d in metrics],[]) # aggregate to single list
     summary_metrics['hard brake rate'] = sum(all_hard_brakes)/len(all_hard_brakes)
 
     # average number of timesteps
@@ -294,11 +296,23 @@ def comparison_metrics(policy_metrics:List[Dict[str,list]],
     """
     comparison_metrics = {}
 
+    # rwse
+    expert_traj, policy_traj = [], []
+    for iR in range(len(policy_metrics)):
+        for iTraj in range(len(policy_metrics[iR]['x_all'])):
+            expert_traj.append(np.vstack((expert_metrics[iR]['x_all'][iTraj], expert_metrics[iR]['y_all'][iTraj]))) 
+            policy_traj.append(np.vstack((policy_metrics[iR]['x_all'][iTraj], policy_metrics[iR]['y_all'][iTraj]))) 
+    assert len(expert_traj)==len(policy_traj)
+    comparison_metrics['rwse'] = rwse(expert_traj, policy_traj)
+
     # average velocity shortfall
     expert_vavg = np.array(sum([d['v_avg'] for d in expert_metrics],[]))
     policy_vavg = np.array(sum([d['v_avg'] for d in policy_metrics],[]))
     assert len(expert_vavg)==len(policy_vavg)
     comparison_metrics['mean shortfall velocity'] = np.mean(expert_vavg - policy_vavg)
+
+    # Average |Delta V average|
+    comparison_metrics['average absolute average velocity'] = np.mean(np.abs(expert_vavg - policy_vavg))
     
     # velocity JSD
     expert_vs = torch.tensor(np.concatenate([np.concatenate(d['v_all']) for d in expert_metrics]))

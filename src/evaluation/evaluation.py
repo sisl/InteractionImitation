@@ -39,7 +39,7 @@ class IntersimpleEvaluation:
         self.is_options_env = isinstance(self.env, (OptionsEnv, OptionsTimeLimit))
 
         # metrics present on every step of every episode
-        self.metric_keys_all = ['v_all', 'a_all', 'col_all']
+        self.metric_keys_all = ['x_all', 'y_all', 'v_all', 'a_all', 'col_all']
 
         # metrics calculated after the fact, with one per episode
         self.metric_keys_single = ['j_all', 'v_avg','a_avg', 'col','brake', 't']
@@ -129,6 +129,8 @@ class IntersimpleEvaluation:
 
     def eval_policy_step(self, info, done, _agent):
         # Increase collision counter if episode terminated with a collision
+        self._metrics['x_all'][_agent].append(info['prev_state'][_agent,0].item())
+        self._metrics['y_all'][_agent].append(info['prev_state'][_agent,1].item())
         self._metrics['v_all'][_agent].append(info['prev_state'][_agent,2].item())
         self._metrics['a_all'][_agent].append(info['action_taken'][_agent,0].item())
         col = info['collision']
@@ -144,10 +146,12 @@ class IntersimpleEvaluation:
         """
         Postprocess and metrics after simulation episodes
         """
-        # self.metric_keys_all = ['v_all', 'a_all', 'col_all']
+        # self.metric_keys_all = ['x_all','y_all','v_all', 'a_all', 'col_all']
         # self.metric_keys_single = ['j_all', 'v_avg','a_avg', 'col','brake', 't']
 
         for i in range(self.n_episodes):
+            self._metrics['x_all'][i] = np.array(self._metrics['x_all'][i])
+            self._metrics['y_all'][i] = np.array(self._metrics['y_all'][i])
             self._metrics['v_all'][i] = np.array(self._metrics['v_all'][i])
             self._metrics['a_all'][i] = np.array(self._metrics['a_all'][i])
 
