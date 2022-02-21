@@ -158,8 +158,16 @@ class ReparamPolicy(ReparamModule):
     def kl_divergence(self, *args, **kwargs):
         return self.module.kl_divergence(*args, **kwargs)
     
-    def predict(self, *args, **kwargs):
-        return self.module.predict(*args, **kwargs)
+    def predict(self, obs, *args, **kwargs):
+        obs = torch.tensor(obs)
+        return self.module._predict(self.forward(obs), *args, **kwargs)
     
     def unsafe_probability_mass(self, *args, **kwargs):
         return self.module.unsafe_probability_mass(*args, **kwargs)
+
+class ReparamSafePolicy(ReparamPolicy):
+
+    def predict(self, obs, *args, **kwargs):
+        observation = torch.tensor(obs['observation'])
+        safe_actions = torch.tensor(obs['safe_actions'])
+        return self.module._predict(self.forward(observation, safe_actions), *args, **kwargs)

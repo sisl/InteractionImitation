@@ -24,10 +24,13 @@ class SetMaskedDiscretePolicy(SetDiscretePolicy):
     def predict(self, observations, state=None, episode_start=None, deterministic=True):
         observation = torch.tensor(observations['observation'])
         safe_actions = torch.tensor(observations['safe_actions'])
+        return self._predict(self.forward(observation, safe_actions), state, episode_start, deterministic)
+    
+    def _predict(self, dist, state=None, episode_start=None, deterministic=True):
         if deterministic:
-            _, actions = self.forward(observation, safe_actions).max(-1)
+            _, actions = self.torch_dist(dist).probs.max(-1)
         else:
-            actions = self.sample(self.forward(observation, safe_actions))
+            actions = self.sample(dist)
         return actions, None
     
     # def torch_dist_nomask(self, dist):

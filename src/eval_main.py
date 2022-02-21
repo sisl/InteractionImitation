@@ -10,7 +10,7 @@ import src.gail.options as options_envs
 from src.evaluation.metrics import divergence, visualize_distribution, rwse
 from src.evaluation.utils import save_metrics
 from src.core.policy import SetPolicy, SetDiscretePolicy
-from src.core.reparam_module import ReparamPolicy
+from src.core.reparam_module import ReparamPolicy, ReparamSafePolicy
 from src.options import envs as options_envs2
 from src.safe_options.policy import SetMaskedDiscretePolicy
 from src.safe_options import options as options_envs3
@@ -70,7 +70,7 @@ def load_policy(method:str,
             torch.zeros(env.observation_space['observation'].shape),
             torch.zeros(env.observation_space['safe_actions'].shape)
         )
-        policy = ReparamPolicy(policy)
+        policy = ReparamSafePolicy(policy)
         policy.load_state_dict(torch.load(policy_file))
         policy.eval()
     elif method == 'sgail-ppo':
