@@ -8,6 +8,7 @@ from src.baselines import IDMRulePolicy
 from src.evaluation import IntersimpleEvaluation
 import src.gail.options as options_envs
 from src.evaluation.metrics import divergence, visualize_distribution
+from src.evaluation.utils import save_metrics
 from src.core.policy import SetPolicy, SetDiscretePolicy
 from src.core.reparam_module import ReparamPolicy
 from src.options import envs as options_envs2
@@ -28,9 +29,9 @@ def load_policy(method:str,
     Load a model given a path and the method
     
     Args:
-        load_policy (str): the path to the model
         method (str): the method for the model
-        skip_load (bool): whether to skip loading
+        policy_file (str): the path to the model
+        policy_kwargs (str): the path to the model
         env (Intersimple): Intersimple environment for evaluation (necessary for IDM policy)
     Returns:
         policy (Optional[BaseAlgorithm]): the policy to evaluate
@@ -277,7 +278,7 @@ def summary_metrics(metrics:List[Dict[str,list]]) -> Dict[str,float]:
     return summary_metrics
 
 def comparison_metrics(policy_metrics:List[Dict[str,list]], 
-    expert_metrics:List[Dict[str,list]]) -> Dict[str,float]:
+    expert_metrics:List[Dict[str,list]], outbase:str='' ) -> Dict[str,float]:
     """
     Provide distributional comparison between different sets of metrics
 
@@ -286,6 +287,7 @@ def comparison_metrics(policy_metrics:List[Dict[str,list]],
             evaluated on the kth episode (car) of the ith roundabout trackfile under a policy
         expert_metrics (list of dicts): expert_metrics[i][j][k] returns the value of metric 'j' 
             evaluated on the kth episode (car) of the ith expert roundabout trackfile
+        outbase (str): path to save output figs to
 
     Returns:   
         comparison_metrics (Dict[str,float]): dict mapping comparison metric description to value
@@ -302,19 +304,19 @@ def comparison_metrics(policy_metrics:List[Dict[str,list]],
     expert_vs = torch.tensor(np.concatenate([np.concatenate(d['v_all']) for d in expert_metrics]))
     policy_vs = torch.tensor(np.concatenate([np.concatenate(d['v_all']) for d in policy_metrics]))
     comparison_metrics['velocity distribution divergence'] = divergence(expert_vs, policy_vs)
-    visualize_distribution(expert_vs, policy_vs, 'velocity_jsd')
+    visualize_distribution(expert_vs, policy_vs, outbase+'_velocity_jsd')
     
     # acceleration JSD
     expert_as = torch.tensor(np.concatenate([np.concatenate(d['a_all']) for d in expert_metrics]))
     policy_as = torch.tensor(np.concatenate([np.concatenate(d['a_all']) for d in policy_metrics]))
     comparison_metrics['acceleration distribution divergence'] = divergence(expert_as, policy_as)
-    visualize_distribution(expert_as, policy_as, 'accel_jsd')
+    visualize_distribution(expert_as, policy_as, outbase+'_accel_jsd')
     
     # jerk JSD
     expert_jerks = torch.tensor(np.concatenate([np.concatenate(d['j_all']) for d in expert_metrics]))
     policy_jerks = torch.tensor(np.concatenate([np.concatenate(d['j_all']) for d in policy_metrics]))
     comparison_metrics['jerk distribution divergence'] = divergence(expert_jerks, policy_jerks)
-    visualize_distribution(expert_jerks, policy_jerks, 'jerk_jsd')
+    visualize_distribution(expert_jerks, policy_jerks, outbase+'_jerk_jsd')
 
     for key in comparison_metrics.keys():
         print(f'{key}: {comparison_metrics[key]}')
@@ -345,21 +347,26 @@ def eval_main(
     # set seed
     np.random.seed(seed)
     torch.manual_seed(seed)
+    pfilename = policy_file.split('/')[-1].split('.')[0]
+    outbase = f'out/{method}/{pfilename}_seed{seed}'
 
     # load expert metrics
     expert_metrics = generate_expert_metrics(locations)
 
     # no comparison for expert
     if method=='expert':
-        summary_metrics(expert_metrics)
+        smetrics = summary_metrics(expert_metrics)
+        save_metrics(smetrics, outbase+'_summary.pkl')
     
     # otherwise evaluate policy on roundabouts and generate metrics
     else:
 
         # evaluate it on the given roundabouts
         policy_metrics = evaluate_policy(locations, env, env_kwargs, method, policy_file, policy_kwargs)
-        summary_metrics(policy_metrics)
-        comparison_metrics(policy_metrics, expert_metrics)
+        smetrics = summary_metrics(policy_metrics)
+        save_metrics(smetrics, outbase+'_summary.pkl')
+        cmetrics = comparison_metrics(policy_metrics, expert_metrics, outbase=outbase)
+        save_metrics(cmetrics, outbase+'_comparison.pkl')
 
 if __name__=='__main__':
     import fire
