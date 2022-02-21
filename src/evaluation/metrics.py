@@ -9,7 +9,7 @@ from typing import List
 
 def rwse(expert:List[np.ndarray], policy:List[np.ndarray], dt:float=0.1) -> float:
     """
-    Calculated time-weighted 
+    Calculate average mean squared displacement error
     
     Args:
         expert (List[np.ndarray]): all position trajectories for all expert rollouts
@@ -24,8 +24,23 @@ def rwse(expert:List[np.ndarray], policy:List[np.ndarray], dt:float=0.1) -> floa
     assert len(expert) == len(policy)
 
     # calculate rwse
+    rwse = []
+    for expert_trajectory, policy_trajectory in zip(expert, policy):
+        _, T1 = expert_trajectory.shape
+        _, T2 = policy_trajectory.shape
+        minT = min(T1, T2)
 
-    return 0.0
+        crop_expert_trajectory = expert_trajectory[:, :minT]
+        crop_policy_trajectory = policy_trajectory[:, :minT]
+        e = ((crop_policy_trajectory - crop_expert_trajectory)**2).sum(0).mean()
+
+        rwse.append(e)
+    
+    assert len(rwse) == len(expert)
+    rwse = np.array(rwse)
+    avg_rwse = rwse.mean()
+
+    return avg_rwse
 
 
 
