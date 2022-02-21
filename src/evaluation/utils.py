@@ -47,8 +47,8 @@ def average_metrics(metric_list:List[Dict[str,float]]):
         for i in range(N):
             master_dict[key].append(metric_list[i][key])
         master_dict[key] = np.array(master_dict[key])
-        mu = np.mean(master_dict[key])
-        std2 = np.std(master_dict[key])*2
+        mu = np.nanmean(master_dict[key])
+        std2 = np.nanstd(master_dict[key])*2
         print(f'{key}: {mu} \pm {std2}')
 
 

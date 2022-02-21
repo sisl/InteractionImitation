@@ -4,10 +4,58 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from intersim import collisions
-from typing import List
+from typing import List, Dict
 # import tikzplotlib 
 
-def rwse(expert:List[np.ndarray], policy:List[np.ndarray], dt:float=0.1) -> float:
+def rwse(expert:List[np.ndarray], policy:List[np.ndarray], dt:float=0.1) -> Dict[str,float]:
+    """
+    Calculate average mean squared displacement error
+    
+    Args:
+        expert (List[np.ndarray]): all position trajectories for all expert rollouts
+        policy (List[np.ndarray]): all position trajectories for all policy rollouts
+
+    each trajectory in the list should have shape (2, T). however expert[i] might have a 
+    different T than policy[i]
+    
+    Returns
+        rwse_dict (Dict[str,float]): dict of different RWSEs
+    """
+    assert len(expert) == len(policy)
+
+    # calculate rwse
+    times = [1,2,5,10,15,20]
+    time_indices = [int(t/dt) for t in times]
+    rwse_dict_keys = [f'rwse_{t}s' for t in times]+['rwse_end']
+    se_dict = {key:[] for key in rwse_dict_keys}
+    for expert_trajectory, policy_trajectory in zip(expert, policy):
+        _, T1 = expert_trajectory.shape
+        _, T2 = policy_trajectory.shape
+        minT = min(T1, T2)
+
+        crop_expert_trajectory = expert_trajectory[:, :minT]
+        crop_policy_trajectory = policy_trajectory[:, :minT]
+        
+        # square error along every time
+        se = ((crop_policy_trajectory - crop_expert_trajectory)**2).sum(0)
+        
+        # add to dict with appropriate indexing
+        for time, idx in zip(times, time_indices):
+            if minT >= idx:
+                se_dict[f'rwse_{time}s'].append(se[idx-1])
+        se_dict['rwse_end'].append(se[-1])
+
+    assert len(se_dict['rwse_end']) == len(expert)
+
+    # print how many trajectories of each time:
+    for key in rwse_dict_keys:
+        print('%s has %i elements'%(key, len(se_dict[key])))
+
+    rwse_dict = {key:np.mean(np.array(se_dict[key]))**0.5 for key in rwse_dict_keys}
+
+    return rwse_dict
+
+def rwse_basic(expert:List[np.ndarray], policy:List[np.ndarray], dt:float=0.1) -> float:
     """
     Calculate average mean squared displacement error
     
@@ -41,8 +89,6 @@ def rwse(expert:List[np.ndarray], policy:List[np.ndarray], dt:float=0.1) -> floa
     avg_rwse = rwse.mean()
 
     return avg_rwse
-
-
 
 def visualize_distribution(expert, policy, filestr):
     """

@@ -135,8 +135,8 @@ class IntersimpleEvaluation:
         self._metrics['a_all'][_agent].append(info['action_taken'][_agent,0].item())
         col = info['collision']
 
-        if col:
-            assert done
+        # if col: # commenting out if we dont want to end on collision
+        #     assert done
         self._metrics['col_all'][_agent].append(col)
         
         if done and self.use_pbar:

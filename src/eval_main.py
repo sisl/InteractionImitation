@@ -214,7 +214,7 @@ def evaluate_policy(locations:List[Tuple[int,int]],
 
         # initialize environment
         Env = envs_dict[env_class]
-        eval_env = Env(**env_kwargs)
+        eval_env = Env(**it_env_kwargs)
         evaluator = IntersimpleEvaluation(eval_env)
 
         # load policy
@@ -303,7 +303,7 @@ def comparison_metrics(policy_metrics:List[Dict[str,list]],
             expert_traj.append(np.vstack((expert_metrics[iR]['x_all'][iTraj], expert_metrics[iR]['y_all'][iTraj]))) 
             policy_traj.append(np.vstack((policy_metrics[iR]['x_all'][iTraj], policy_metrics[iR]['y_all'][iTraj]))) 
     assert len(expert_traj)==len(policy_traj)
-    comparison_metrics['rwse'] = rwse(expert_traj, policy_traj)
+    comparison_metrics.update(rwse(expert_traj, policy_traj))
 
     # average velocity shortfall
     expert_vavg = np.array(sum([d['v_avg'] for d in expert_metrics],[]))
@@ -356,7 +356,9 @@ def eval_main(
         env (str): environment class
         method (str): method (expert, bc, gail, rail, hgail, hrail)
     """
-    print(f'Evaluating {method} on {env}')
+    print(f'#############################################################################')
+    print(f'Evaluating {method} from file {policy_file} on {env} at locations {locations}')
+    print(f'#############################################################################')
 
     # set seed
     np.random.seed(seed)
