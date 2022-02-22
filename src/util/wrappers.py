@@ -9,7 +9,7 @@ class TransformObservation(gym.wrappers.TransformObservation):
     def __getattr__(self, name):
         return getattr(self.env, name)
 
-class OptionsTimeLimit(gym.wrappers.TimeLimit):
+class IntersimpleTimeLimit(gym.wrappers.TimeLimit):
     def __getattr__(self, name):
         return getattr(self.env, name)
 

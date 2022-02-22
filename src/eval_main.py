@@ -14,6 +14,7 @@ from src.core.reparam_module import ReparamPolicy, ReparamSafePolicy
 from src.options import envs as options_envs2
 from src.safe_options.policy import SetMaskedDiscretePolicy
 from src.safe_options import options as options_envs3
+from src.util.wrappers import IntersimpleTimeLimit
 
 from typing import Optional, List, Dict, Tuple
 import torch
@@ -201,7 +202,7 @@ def evaluate_policy(locations:List[Tuple[int,int]],
 
     # iterate through vehicles
     for i, location in tqdm(enumerate(locations)):
-        
+
         # add roundabout and track to environent 
         iround, track = location
         rname = intersim.LOCATIONS[iround]
@@ -214,7 +215,14 @@ def evaluate_policy(locations:List[Tuple[int,int]],
 
         # initialize environment
         Env = envs_dict[env_class]
-        eval_env = Env(**it_env_kwargs)
+
+        # wrap in TimeLimit
+        if 'max_episode_steps' in it_env_kwargs.keys():
+            steps = it_env_kwargs.pop('max_episode_steps')
+            eval_env = IntersimpleTimeLimit(Env(**it_env_kwargs), 
+                max_episode_steps=steps)
+        else:
+            eval_env = Env(**it_env_kwargs)
         evaluator = IntersimpleEvaluation(eval_env)
 
         # load policy
@@ -364,7 +372,8 @@ def eval_main(
     np.random.seed(seed)
     torch.manual_seed(seed)
     pfilename = policy_file.split('/')[-1].split('.')[0]
-    outbase = f'out/{method}/{pfilename}_seed{seed}'
+    locstr = 'loc_'+'_'.join([f'r{ro}t{tr}' for (ro,tr) in locations])
+    outbase = f'out/{method}/{locstr}/{pfilename}_seed{seed}'
 
     # load expert metrics
     expert_metrics = generate_expert_metrics(locations)

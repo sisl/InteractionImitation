@@ -24,7 +24,7 @@ def rwse(expert:List[np.ndarray], policy:List[np.ndarray], dt:float=0.1) -> Dict
     assert len(expert) == len(policy)
 
     # calculate rwse
-    times = [1,2,5,10,15,20]
+    times = [1,2,5,10,15,20,25,30]
     time_indices = [int(t/dt) for t in times]
     rwse_dict_keys = [f'rwse_{t}s' for t in times]+['rwse_end']
     se_dict = {key:[] for key in rwse_dict_keys}
