@@ -246,6 +246,14 @@ def summary_metrics(metrics:List[Dict[str,list]]) -> Dict[str,float]:
     """
     # keys = ['col_all','v_all', 'a_all','j_all', 'v_avg', 'a_avg', 'col', 'brake', 't']
     summary_metrics = {}
+    
+    # mean travel distance
+    dt = 0.1
+    travel_ds = []
+    for iRound in range(len(metrics)):
+        for iTraj in range(len(metrics[iRound]['v_all'])):
+            travel_ds.append(dt*sum(metrics[iRound]['v_all'][iTraj]))
+    summary_metrics['mean travel distance'] = sum(travel_ds)/len(travel_ds)
 
     # average average-velocity
     all_vavgs =  sum([d['v_avg'] for d in metrics],[]) # aggregate to single list
@@ -273,6 +281,7 @@ def summary_metrics(metrics:List[Dict[str,list]]) -> Dict[str,float]:
     # collision rate
     all_collisions = sum([d['col'] for d in metrics],[]) # aggregate to single list
     summary_metrics['collision rate'] = sum(all_collisions)/len(all_collisions)
+    summary_metrics['success rate'] = 1 - summary_metrics['collision rate']
 
     # hard brake rate
     all_hard_brakes = sum([d['brake'] for d in metrics],[]) # aggregate to single list
@@ -281,6 +290,8 @@ def summary_metrics(metrics:List[Dict[str,list]]) -> Dict[str,float]:
     # average number of timesteps
     all_ts = sum([d['t'] for d in metrics],[]) # aggregate to single list
     summary_metrics['mean episode length'] = sum(all_ts)/len(all_ts)
+    summary_metrics['mean episode time'] = summary_metrics['mean episode length'] * dt
+
 
     for key in summary_metrics.keys():
         print(f'{key}: {summary_metrics[key]}')
