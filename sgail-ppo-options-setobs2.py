@@ -49,14 +49,14 @@ def training_function(config):
     env_fn = lambda i: envs[i]
 
     policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n) # config net architecture
-    pi_opt = torch.optim.Adam(policy.parameters(), lr=3e-5)  # config learning rate
-    pi_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(pi_opt, gamma=0.98) # config lr decay
+    pi_opt = torch.optim.Adam(policy.parameters(), lr=config['policy']['learning_rate'])
+    pi_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(pi_opt, gamma=config['policy']['learning_rate_decay'])
 
     value = SetValue() # config net architecture
-    v_opt = torch.optim.Adam(value.parameters(), lr=1e-3) # config lr
+    v_opt = torch.optim.Adam(value.parameters(), lr=config['value']['learning_rate'])
 
     discriminator = DeepsetDiscriminator() # config net architecture
-    disc_opt = torch.optim.Adam(discriminator.parameters(), lr=1e-3, weight_decay=1e-3) # config lr, weight decay
+    disc_opt = torch.optim.Adam(discriminator.parameters(), lr=config['discriminator']['learning_rate'], weight_decay=config['discriminator']['weight_decay'])
 
     expert_data = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2.pt'))
     expert_data = Buffer(*expert_data)
@@ -69,19 +69,19 @@ def training_function(config):
         expert_data=expert_data,
         discriminator=discriminator,
         disc_opt=disc_opt,
-        disc_iters=100, # config
+        disc_iters=config['discriminator']['iterations_per_epoch'],
         policy=policy,
         value=value,
         v_opt=v_opt,
-        v_iters=1000, # config
+        v_iters=config['value']['iterations_per_epoch'],
         epochs=200,
         rollout_episodes=60,
         rollout_steps=60,
         gamma=0.99,
         gae_lambda=0.9,
-        clip_ratio=0.2, # config
+        clip_ratio=config['policy']['clip_ratio'],
         pi_opt=pi_opt,
-        pi_iters=100, # config
+        pi_iters=config['policy']['iterations_per_epoch'],
         logger=SummaryWriter(comment='sgail-ppo-options-setobs2'),
         callback=callback,
         lr_schedulers=[pi_lr_scheduler],
@@ -90,7 +90,21 @@ def training_function(config):
 analysis = tune.run(
     training_function,
     config={
-        'dummy': tune.grid_search([0.001, 0.01, 0.1]),
+        'policy': {
+            'learning_rate': tune.grid_search([3e-4]),
+            'learning_rate_decay': tune.grid_search([1.0]),
+            'clip_ratio': tune.grid_search([0.2]),
+            'iterations_per_epoch': tune.grid_search([100]),
+        },
+        'value': {
+            'learning_rate': tune.grid_search([1e-3]),
+            'iterations_per_epoch': tune.grid_search([1000]),
+        },
+        'discriminator': {
+            'learning_rate': tune.grid_search([1e-3]),
+            'weight_decay': tune.grid_search([1e-4]),
+            'iterations_per_epoch': tune.grid_search([100]),
+        }
     }
 )
 
