@@ -51,12 +51,12 @@ class Policy(BasePolicy):
 
 class DiscretePolicy(BasePolicy):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, hidden_layer_size=50, **kwargs):
         super().__init__(*args, **kwargs)
         self.nn = nn.Sequential(
-            nn.LazyLinear(50),
+            nn.LazyLinear(hidden_layer_size),
             nn.Tanh(),
-            nn.LazyLinear(50),
+            nn.LazyLinear(hidden_layer_size),
             nn.Tanh(),
             nn.LazyLinear(self.action_dim),
         )

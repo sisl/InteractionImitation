@@ -48,7 +48,7 @@ def training_function(config):
 
     env_fn = lambda i: envs[i]
 
-    policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n) # config net architecture
+    policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n, hidden_layer_size=config['policy']['hidden_layer_size']) # config net architecture
     pi_opt = torch.optim.Adam(policy.parameters(), lr=config['policy']['learning_rate'])
     pi_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(pi_opt, gamma=config['policy']['learning_rate_decay'])
 
@@ -91,10 +91,11 @@ analysis = tune.run(
     training_function,
     config={
         'policy': {
-            'learning_rate': tune.grid_search([3e-4]),
-            'learning_rate_decay': tune.grid_search([1.0]),
-            'clip_ratio': tune.grid_search([0.2]),
+            'learning_rate': tune.grid_search([1e-5, 7e-5, 3e-4]),
+            'learning_rate_decay': tune.grid_search([1.0, 0.98]),
+            'clip_ratio': tune.grid_search([0.2, 0.1]),
             'iterations_per_epoch': tune.grid_search([100]),
+            'hidden_layer_size': tune.grid_search([10, 25, 50])
         },
         'value': {
             'learning_rate': tune.grid_search([1e-3]),
