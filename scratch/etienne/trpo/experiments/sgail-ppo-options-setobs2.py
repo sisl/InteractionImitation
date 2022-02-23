@@ -49,6 +49,7 @@ env_fn = lambda i: envs[i]
 
 policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n)
 pi_opt = torch.optim.Adam(policy.parameters(), lr=3e-4)
+pi_lr_scheduler = torch.optim.lr_scheduler.StepLR(pi_opt, step_size=50, gamma=0.2)
 
 value = SetValue()
 v_opt = torch.optim.Adam(value.parameters(), lr=1e-3)
@@ -85,6 +86,7 @@ value, policy = gail_ppo(
     pi_iters=100,
     logger=SummaryWriter(comment='sgail-ppo-options-setobs2'),
     callback=callback,
+    lr_schedulers=[pi_lr_scheduler],
 )
 
 torch.save(policy.state_dict(), 'sgail-ppo-options-setobs2.pt')

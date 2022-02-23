@@ -77,7 +77,7 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
 
 def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value,
          v_opt, v_iters, epochs, rollout_episodes, rollout_steps, gamma,
-         gae_lambda, clip_ratio, pi_opt, pi_iters, target_kl=None, max_grad_norm=None, wasserstein=False, wasserstein_c=None, logger=TerminalLogger(), callback=None):
+         gae_lambda, clip_ratio, pi_opt, pi_iters, target_kl=None, max_grad_norm=None, wasserstein=False, wasserstein_c=None, logger=TerminalLogger(), callback=None, lr_schedulers=[]):
 
     logger.add_scalar('expert/mean_episode_length', (~expert_data.dones).sum() / expert_data.states.shape[0])
     logger.add_scalar('expert/mean_reward_per_episode', expert_data.rewards[~expert_data.dones].sum() / expert_data.states.shape[0])
@@ -108,6 +108,9 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
 
         if callback is not None:
             callback(epoch, value, policy)
+    
+    for lr_scheduler in lr_schedulers:
+        lr_scheduler.step()
     
     return value, policy
 
