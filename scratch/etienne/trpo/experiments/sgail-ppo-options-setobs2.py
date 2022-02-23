@@ -15,6 +15,7 @@ from src.util.wrappers import CollisionPenaltyWrapper, TransformObservation, Set
 import numpy as np
 from src.safe_options.options import SafeOptionsEnv
 from torch.utils.tensorboard import SummaryWriter
+from ray import tune
 
 obs_min = np.array([
     [-1000, -1000, 0, -np.pi, -1e-1, 0.],
@@ -47,49 +48,54 @@ envs = [SafeOptionsEnv(Setobs(
 
 env_fn = lambda i: envs[i]
 
-policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n)
-pi_opt = torch.optim.Adam(policy.parameters(), lr=3e-4)
-pi_lr_scheduler = torch.optim.lr_scheduler.StepLR(pi_opt, step_size=50, gamma=0.2)
+def training_function(config):
+    policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n) # config net architecture
+    pi_opt = torch.optim.Adam(policy.parameters(), lr=3e-5)  # config learning rate
+    pi_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(pi_opt, gamma=0.98) # config lr decay
 
-value = SetValue()
-v_opt = torch.optim.Adam(value.parameters(), lr=1e-3)
+    value = SetValue() # config net architecture
+    v_opt = torch.optim.Adam(value.parameters(), lr=1e-3) # config lr
 
-discriminator = DeepsetDiscriminator()
-disc_opt = torch.optim.Adam(discriminator.parameters(), lr=1e-3, weight_decay=1e-4)
+    discriminator = DeepsetDiscriminator() # config net architecture
+    disc_opt = torch.optim.Adam(discriminator.parameters(), lr=1e-3, weight_decay=1e-3) # config lr, weight decay
 
-expert_data = torch.load('intersimple-expert-data-setobs2.pt')
-expert_data = Buffer(*expert_data)
+    expert_data = torch.load('intersimple-expert-data-setobs2.pt')
+    expert_data = Buffer(*expert_data)
 
-# %%
-def callback(epoch, value, policy):
-    if not epoch % 10:
-        torch.save(policy.state_dict(), f'sgail-ppo-options-setobs2-{epoch}.pt')
-        torch.save(value.state_dict(), f'sgail-ppo-options-setobs2-value-{epoch}.pt')
+    def callback(info):
+        tune.report(gen_mean_reward_per_episode=info['gen/mean_reward_per_episode'])
 
-value, policy = gail_ppo(
-    env_fn=env_fn,
-    expert_data=expert_data,
-    discriminator=discriminator,
-    disc_opt=disc_opt,
-    disc_iters=100,
-    policy=policy,
-    value=value,
-    v_opt=v_opt,
-    v_iters=1000,
-    epochs=200,
-    rollout_episodes=60,
-    rollout_steps=60,
-    gamma=0.99,
-    gae_lambda=0.9,
-    clip_ratio=0.2,
-    pi_opt=pi_opt,
-    pi_iters=100,
-    logger=SummaryWriter(comment='sgail-ppo-options-setobs2'),
-    callback=callback,
-    lr_schedulers=[pi_lr_scheduler],
+    value, policy = gail_ppo(
+        env_fn=env_fn,
+        expert_data=expert_data,
+        discriminator=discriminator,
+        disc_opt=disc_opt,
+        disc_iters=100, # config
+        policy=policy,
+        value=value,
+        v_opt=v_opt,
+        v_iters=1000, # config
+        epochs=200,
+        rollout_episodes=60,
+        rollout_steps=60,
+        gamma=0.99,
+        gae_lambda=0.9,
+        clip_ratio=0.2, # config
+        pi_opt=pi_opt,
+        pi_iters=100, # config
+        logger=SummaryWriter(comment='sgail-ppo-options-setobs2'),
+        callback=callback,
+        lr_schedulers=[pi_lr_scheduler],
+    )
+
+analysis = tune.run(
+    training_function,
+    config={
+        'dummy': tune.grid_search([0.001, 0.01, 0.1]),
+    }
 )
 
-torch.save(policy.state_dict(), 'sgail-ppo-options-setobs2.pt')
+print('Best config: ', analysis.get_best_config(metric='gen_mean_reward_per_episode', mode='min'))
 
 # %%
 policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n)

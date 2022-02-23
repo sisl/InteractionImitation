@@ -53,7 +53,8 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
         generator_data.ll.actions += 0.1 * torch.randn_like(generator_data.ll.actions)
 
         logger.add_scalar('gen/mean_episode_length', (~generator_data.ll.dones).sum() / generator_data.ll.states.shape[0], epoch)
-        logger.add_scalar('gen/mean_reward_per_episode', generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0], epoch)
+        gen_mean_reward_per_episode = generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0]
+        logger.add_scalar('gen/mean_reward_per_episode', gen_mean_reward_per_episode, epoch)
         logger.add_scalar('gen/unsafe_probability_mass', policy.unsafe_probability_mass(policy(generator_data.hl.states[~generator_data.hl.dones], generator_data.hl.safe_actions[~generator_data.hl.dones])).mean(), epoch)
 
         discriminator, loss = train_discriminator(expert_data, generator_data.ll, discriminator, disc_opt, disc_iters, wasserstein, wasserstein_c)
@@ -71,7 +72,12 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
         expert_data = roll_buffer(expert_data, shifts=-3, dims=0)
 
         if callback is not None:
-            callback(epoch, value, policy)
+            callback({
+                'epoch': epoch,
+                'value': value,
+                'policy': policy,
+                'gen/mean_reward_per_episode': gen_mean_reward_per_episode,
+            })
     
     return value, policy
 
@@ -89,7 +95,8 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
         generator_data.ll.actions += 0.1 * torch.randn_like(generator_data.ll.actions)
 
         logger.add_scalar('gen/mean_episode_length', (~generator_data.ll.dones).sum() / generator_data.ll.states.shape[0], epoch)
-        logger.add_scalar('gen/mean_reward_per_episode', generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0], epoch)
+        gen_mean_reward_per_episode = generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0]
+        logger.add_scalar('gen/mean_reward_per_episode', gen_mean_reward_per_episode, epoch)
         logger.add_scalar('gen/unsafe_probability_mass', policy.unsafe_probability_mass(policy(generator_data.hl.states[~generator_data.hl.dones], generator_data.hl.safe_actions[~generator_data.hl.dones])).mean(), epoch)
 
         discriminator, loss = train_discriminator(expert_data, generator_data.ll, discriminator, disc_opt, disc_iters, wasserstein, wasserstein_c)
@@ -107,7 +114,12 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
         expert_data = roll_buffer(expert_data, shifts=-3, dims=0)
 
         if callback is not None:
-            callback(epoch, value, policy)
+            callback({
+                'epoch': epoch,
+                'value': value,
+                'policy': policy,
+                'gen/mean_reward_per_episode': gen_mean_reward_per_episode,
+            })
     
     for lr_scheduler in lr_schedulers:
         lr_scheduler.step()
