@@ -1,6 +1,5 @@
 # %%
-import sys
-sys.path.append('../../../../')
+import os
 
 import gym
 from src.safe_options.options import gail_ppo, Buffer
@@ -59,7 +58,7 @@ def training_function(config):
     discriminator = DeepsetDiscriminator() # config net architecture
     disc_opt = torch.optim.Adam(discriminator.parameters(), lr=1e-3, weight_decay=1e-3) # config lr, weight decay
 
-    expert_data = torch.load('intersimple-expert-data-setobs2.pt')
+    expert_data = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2.pt'))
     expert_data = Buffer(*expert_data)
 
     def callback(info):
@@ -98,21 +97,21 @@ analysis = tune.run(
 print('Best config: ', analysis.get_best_config(metric='gen_mean_reward_per_episode', mode='min'))
 
 # %%
-policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n)
-policy(torch.zeros(env_fn(0).observation_space['observation'].shape), torch.zeros(env_fn(0).observation_space['safe_actions'].shape))
-policy.load_state_dict(torch.load('sgail-ppo-options-setobs2.pt'))
+# policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n)
+# policy(torch.zeros(env_fn(0).observation_space['observation'].shape), torch.zeros(env_fn(0).observation_space['safe_actions'].shape))
+# policy.load_state_dict(torch.load('sgail-ppo-options-setobs2.pt'))
 
-env = env_fn(0)
-obs = env.reset()
-env.render(mode='post')
-for i in range(300):
-    action = policy.sample(policy(
-        torch.tensor(obs['observation'], dtype=torch.float32),
-        torch.tensor(obs['safe_actions'], dtype=torch.float32),
-    ))
-    obs, reward, done, _ = env.step(action, render_mode='post')
-    print('step', i, 'reward', reward, 'safe actions', obs['safe_actions'])
-    if done:
-        break
-env.close()
+# env = env_fn(0)
+# obs = env.reset()
+# env.render(mode='post')
+# for i in range(300):
+#     action = policy.sample(policy(
+#         torch.tensor(obs['observation'], dtype=torch.float32),
+#         torch.tensor(obs['safe_actions'], dtype=torch.float32),
+#     ))
+#     obs, reward, done, _ = env.step(action, render_mode='post')
+#     print('step', i, 'reward', reward, 'safe actions', obs['safe_actions'])
+#     if done:
+#         break
+# env.close()
 # %%
