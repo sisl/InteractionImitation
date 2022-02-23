@@ -204,6 +204,7 @@ class IDMRulePolicy(BaseAlgorithm):
         else:
             d = np.Inf
             d_des = self.d_min
+            self._env._env._graph._neighbor_dict={}
 
         assert (d_des>= self.d_min)
         action = self.a_max*(1 - (v_ego/self.v_max)**4 - (d_des/d)**2)
