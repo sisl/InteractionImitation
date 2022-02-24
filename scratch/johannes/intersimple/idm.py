@@ -32,7 +32,7 @@ for agent in range(151):
         # print('step', i, 'reward', reward)
         if done:
             if reward < -500:
-                collising_agents.append(agent)
+                colliding_agents.append(agent)
                 print("  Collision")
             break
     env.close(filestr='idm/agent_{}'.format(agent))
