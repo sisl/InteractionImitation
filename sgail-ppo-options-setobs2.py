@@ -38,16 +38,17 @@ def training_function(config):
         [50, np.pi, 20, 20, np.pi, 1e-1],
     ]).reshape(-1)
 
-    envs = [SafeOptionsEnv(Setobs(
+    envs = sum([[SafeOptionsEnv(Setobs(
         TransformObservation(CollisionPenaltyWrapper(IntersimpleLidarFlatRandom(
             n_rays=5,
             reward=functools.partial(
                 speed_reward,
                 collision_penalty=0
             ),
-            stop_on_collision=False,
+            stop_on_collision=False, track=track,
         ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
-    ), options=config['policy']['option'], safe_actions_collision_method='circle', abort_unsafe_collision_method='circle') for _ in range(60)]
+    ), options=config['policy']['option'], safe_actions_collision_method='circle', 
+    abort_unsafe_collision_method='circle') for _ in range(20)] for track in range(4)],[])
 
     env_fn = lambda i: envs[i]
 
