@@ -42,7 +42,7 @@ def training_function(config):
                 speed_reward,
                 collision_penalty=0
             ),
-            stop_on_collision=True,
+            stop_on_collision=False,
         ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
     ), options=[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5), (10, 5)], safe_actions_collision_method='circle', abort_unsafe_collision_method='circle') for _ in range(60)]
 
@@ -58,7 +58,17 @@ def training_function(config):
     discriminator = DeepsetDiscriminator() # config net architecture
     disc_opt = torch.optim.Adam(discriminator.parameters(), lr=config['discriminator']['learning_rate'], weight_decay=config['discriminator']['weight_decay'])
 
-    expert_data = torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2.pt'))
+    expert_data = [
+        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track0.pt')),
+        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track1.pt')),
+        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track2.pt')),
+        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track3.pt')),
+    ]
+    d0 = [d[0] for d in expert_data]
+    d1 = [d[1] for d in expert_data]
+    d2 = [d[2] for d in expert_data]
+    d3 = [d[3] for d in expert_data]
+    expert_data = (torch.cat(d0), torch.cat(d1), torch.cat(d2), torch.cat(d3))
     expert_data = Buffer(*expert_data)
 
     def callback(info):
@@ -91,11 +101,11 @@ analysis = tune.run(
     training_function,
     config={
         'policy': {
-            'learning_rate': tune.grid_search([1e-5, 7e-5, 3e-4]),
-            'learning_rate_decay': tune.grid_search([1.0, 0.98]),
-            'clip_ratio': tune.grid_search([0.2, 0.1]),
+            'learning_rate': tune.grid_search([3e-4]),
+            'learning_rate_decay': tune.grid_search([1.0]),
+            'clip_ratio': tune.grid_search([0.2]),
             'iterations_per_epoch': tune.grid_search([100]),
-            'hidden_layer_size': tune.grid_search([10, 25, 50])
+            'hidden_layer_size': tune.grid_search([10])
         },
         'value': {
             'learning_rate': tune.grid_search([1e-3]),
@@ -109,7 +119,7 @@ analysis = tune.run(
     }
 )
 
-print('Best config: ', analysis.get_best_config(metric='gen_mean_reward_per_episode', mode='min'))
+print('Best config: ', analysis.get_best_config(metric='gen_mean_reward_per_episode', mode='max'))
 
 # %%
 # policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n)
