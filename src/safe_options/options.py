@@ -191,6 +191,7 @@ class SafeOptionsEnv(OptionsEnv):
             return np.ones(len(self.options), dtype=bool)
 
         plans = [self.plan(o) for o in self.options]
+        plans = [np.pad(p, (0, self.max_plan_length - len(p)), constant_values=np.nan) for p in plans]
         plans = np.stack(plans)
         safe = feasible(self.env, plans, method=self.safe_actions_collision_method)
         if not safe.any():
