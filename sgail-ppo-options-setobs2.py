@@ -17,6 +17,8 @@ from src.safe_options.options import SafeOptionsEnv
 from torch.utils.tensorboard import SummaryWriter
 from ray import tune
 
+DIR = os.path.dirname(os.path.abspath(__file__))
+
 def training_function(config):
     obs_min = np.array([
         [-1000, -1000, 0, -np.pi, -1e-1, 0.],
@@ -63,10 +65,10 @@ def training_function(config):
     disc_opt = torch.optim.Adam(discriminator.parameters(), lr=config['discriminator']['learning_rate'], weight_decay=config['discriminator']['weight_decay'])
 
     expert_data = [
-        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track0.pt')),
-        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track1.pt')),
-        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track2.pt')),
-        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track3.pt')),
+        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track0.pt')),
+        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track1.pt')),
+        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track2.pt')),
+        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track3.pt')),
     ]
     d0 = [d[0] for d in expert_data]
     d1 = [d[1] for d in expert_data]
