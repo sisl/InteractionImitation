@@ -9,3 +9,4 @@ hyperopt
 psutil
 fire
 stable_baselines3
+tensorboard

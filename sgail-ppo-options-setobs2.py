@@ -7,6 +7,7 @@ from src.core.value import SetValue
 from src.safe_options.policy import SetMaskedDiscretePolicy
 from src.core.discriminator import DeepsetDiscriminator
 import torch.optim
+import torch.nn
 from intersim.envs import IntersimpleLidarFlatRandom
 from intersim.envs.intersimple import speed_reward
 import functools
@@ -44,11 +45,14 @@ def training_function(config):
             ),
             stop_on_collision=False,
         ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
-    ), options=[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5), (10, 5)], safe_actions_collision_method='circle', abort_unsafe_collision_method='circle') for _ in range(60)]
+    ), options=config['policy']['option'], safe_actions_collision_method='circle', abort_unsafe_collision_method='circle') for _ in range(60)]
 
     env_fn = lambda i: envs[i]
 
-    policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n, hidden_layer_size=config['policy']['hidden_layer_size']) # config net architecture
+    policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n, 
+        n_hidden_layers=config['policy']['n_hidden_layers'],
+        hidden_layer_size=config['policy']['hidden_layer_size'],
+        activation=config['policy']['activation'] ) # config net architecture
     pi_opt = torch.optim.Adam(policy.parameters(), lr=config['policy']['learning_rate'])
     pi_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(pi_opt, gamma=config['policy']['learning_rate_decay'])
 
@@ -105,7 +109,15 @@ analysis = tune.run(
             'learning_rate_decay': tune.grid_search([1.0]),
             'clip_ratio': tune.grid_search([0.2]),
             'iterations_per_epoch': tune.grid_search([100]),
-            'hidden_layer_size': tune.grid_search([10])
+            'hidden_layer_size': tune.grid_search([10, 20, 30]),
+            'n_hidden_layers': tune.grid_search([1, 2, 3]),
+            'activation':tune.grid_search([torch.nn.LeakyReLU, torch.nn.Tanh]),
+            'option': tune.grid_search([[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5), (10, 5)],
+                                        [(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5), (10, 5),
+                                         (0, 10), (1, 10), (2, 10), (4, 10), (6, 10), (8, 10), (10, 10)],
+                                        [(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5), (10, 5),
+                                         (0, 10), (1, 10), (2, 10), (4, 10), (6, 10), (8, 10), (10, 10),
+                                         (0, 20), (1, 20), (2, 20), (4, 20), (6, 20), (8, 20), (20, 10)]])
         },
         'value': {
             'learning_rate': tune.grid_search([1e-3]),
