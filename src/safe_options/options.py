@@ -249,9 +249,9 @@ class SafeOptionsEnv(OptionsEnv):
             if d:
                 break
 
-            if self.abort_unsafe_collision_method is not None and \
-                not feasible(self.env, plan[k:], method=self.abort_unsafe_collision_method):
-                break
+            if self.abort_unsafe_collision_method is not None:
+                if not feasible(self.env, plan[k:], method=self.abort_unsafe_collision_method):
+                    break
         
         n_steps = k + 1
         return observations, actions, rewards, env_done, plan_done, infos, n_steps
