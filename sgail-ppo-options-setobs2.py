@@ -92,20 +92,16 @@ def training_function(config):
     expert_data = (torch.cat(d0), torch.cat(d1), torch.cat(d2), torch.cat(d3))
     expert_data = Buffer(*expert_data)
 
-    run_folder = str(datetime.now())
-    os.mkdir(os.path.join(DIR, run_folder))
-    with open(os.path.join(DIR, run_folder, 'config.json'), 'w') as f:
-        json.dump(config, f, indent=4)
-
     def callback(info):
         tune.report(gen_mean_reward_per_episode=info['gen/mean_reward_per_episode'],
                     disc_mean_reward_per_episode=info['disc/mean_reward_per_episode'], 
-                    mean_episode_length=info['gen/mean_episode_length'])
+                    mean_episode_length=info['gen/mean_episode_length'],
+                    gen_collision_rate=info['gen/collision_rate'])
         
         # save model checkpoints
         ep = info['epoch'] + 1
         if (ep % 25 == 0):
-            torch.save(info['policy'].state_dict(), os.path.join(DIR, run_folder, f'policy_epoch{ep}.pt'))
+            torch.save(info['policy'].state_dict(), f'policy_epoch{ep}.pt')
 
     value, policy = gail_ppo(
         env_fn=env_fn,
@@ -164,7 +160,7 @@ analysis = tune.run(
     }
 )
 
-print('Best config: ', analysis.get_best_config(metric='gen_mean_reward_per_episode', mode='max'))
+print('Best config: ', analysis.get_best_config(metric='gen_collision_rate', mode='min'))
 
 # %%
 # policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n)

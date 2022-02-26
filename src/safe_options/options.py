@@ -57,7 +57,8 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
         gen_mean_reward_per_episode = generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0]
         logger.add_scalar('gen/mean_reward_per_episode', gen_mean_reward_per_episode, epoch)
         logger.add_scalar('gen/unsafe_probability_mass', policy.unsafe_probability_mass(policy(generator_data.hl.states[~generator_data.hl.dones], generator_data.hl.safe_actions[~generator_data.hl.dones])).mean(), epoch)
-        logger.add_scalar('gen/collision_rate', (1. * collisions.any(-1)).mean(), epoch)
+        gen_collision_rate = (1. * collisions.any(-1)).mean()
+        logger.add_scalar('gen/collision_rate', gen_collision_rate, epoch)
 
         discriminator, loss = train_discriminator(expert_data, generator_data.ll, discriminator, disc_opt, disc_iters, wasserstein, wasserstein_c)
         if wasserstein:
@@ -81,6 +82,7 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
                 'policy': policy,
                 'gen/mean_episode_length': gen_mean_episode_length.item(),
                 'gen/mean_reward_per_episode': gen_mean_reward_per_episode.item(),
+                'gen/collision_rate': gen_collision_rate.item(),
                 'disc/mean_reward_per_episode': disc_mean_reward_per_episode.item(),
             })
     
@@ -103,7 +105,8 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
         gen_mean_reward_per_episode = generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0]
         logger.add_scalar('gen/mean_reward_per_episode', gen_mean_reward_per_episode, epoch)
         logger.add_scalar('gen/unsafe_probability_mass', policy.unsafe_probability_mass(policy(generator_data.hl.states[~generator_data.hl.dones], generator_data.hl.safe_actions[~generator_data.hl.dones])).mean(), epoch)
-        logger.add_scalar('gen/collision_rate', (1. * collisions.any(-1)).mean(), epoch)
+        gen_collision_rate = (1. * collisions.any(-1)).mean()
+        logger.add_scalar('gen/collision_rate', gen_collision_rate, epoch)
 
         discriminator, loss = train_discriminator(expert_data, generator_data.ll, discriminator, disc_opt, disc_iters, wasserstein, wasserstein_c)
         if wasserstein:
@@ -127,6 +130,7 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
                 'policy': policy,
                 'gen/mean_episode_length': gen_mean_episode_length.item(),
                 'gen/mean_reward_per_episode': gen_mean_reward_per_episode.item(),
+                'gen/collision_rate': gen_collision_rate.item(),
                 'disc/mean_reward_per_episode': disc_mean_reward_per_episode.item(),
             })
     
