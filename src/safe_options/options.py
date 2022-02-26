@@ -267,7 +267,7 @@ obs_max = np.array([
     [50, np.pi, 20, 20, np.pi, 1e-1],
 ]).reshape(-1)
 
-def NormalizedSafeOptionsEvalEnv(safe_actions_collision_method=None, abort_unsafe_collision_method=None, **kwargs):
+def NormalizedSafeOptionsEvalEnv(safe_actions_collision_method='circle', abort_unsafe_collision_method='circle', **kwargs):
     return SafeOptionsEnv(Setobs(
         TransformObservation(IntersimpleLidarFlatIncrementingAgent(
             n_rays=5,
