@@ -15,8 +15,11 @@ import numpy as np
 from src.safe_options.options import SafeOptionsEnv
 from torch.utils.tensorboard import SummaryWriter
 from ray import tune
+from datetime import datetime
+import json
 
 def training_function(config):
+    DIR = os.path.dirname(os.path.abspath(__file__))
     obs_min = np.array([
         [-1000, -1000, 0, -np.pi, -1e-1, 0.],
         [0, -np.pi, -20, -20, -np.pi, -1e-1],
@@ -42,9 +45,11 @@ def training_function(config):
                 speed_reward,
                 collision_penalty=0
             ),
-            stop_on_collision=False,
+            stop_on_collision=config['env']['stop_on_collision'],
         ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
-    ), options=[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5), (10, 5)], safe_actions_collision_method='circle', abort_unsafe_collision_method='circle') for _ in range(60)]
+    ), options=[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5), (10, 5)],
+        safe_actions_collision_method=config['env']['safe_actions_collision_method'],
+        abort_unsafe_collision_method=config['env']['abort_unsafe_collision_method']) for _ in range(60)]
 
     env_fn = lambda i: envs[i]
 
@@ -59,10 +64,10 @@ def training_function(config):
     disc_opt = torch.optim.Adam(discriminator.parameters(), lr=config['discriminator']['learning_rate'], weight_decay=config['discriminator']['weight_decay'])
 
     expert_data = [
-        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track0.pt')),
-        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track1.pt')),
-        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track2.pt')),
-        torch.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intersimple-expert-data-setobs2-loc0-track3.pt')),
+        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track0.pt')),
+        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track1.pt')),
+        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track2.pt')),
+        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track3.pt')),
     ]
     d0 = [d[0] for d in expert_data]
     d1 = [d[1] for d in expert_data]
@@ -71,8 +76,16 @@ def training_function(config):
     expert_data = (torch.cat(d0), torch.cat(d1), torch.cat(d2), torch.cat(d3))
     expert_data = Buffer(*expert_data)
 
+    folder = str(datetime.now())
+    os.mkdir(os.path.join(DIR, folder))
+    with open(os.path.join(DIR, folder, 'config.json'), 'w') as f:
+        json.dump(config, f, indent=4)
+
     def callback(info):
         tune.report(gen_mean_reward_per_episode=info['gen/mean_reward_per_episode'])
+        if not info['epoch'] % 10:
+            torch.save(policy.state_dict(), os.path.join(DIR, folder, f'sgail-ppo-options-setobs2-{info["epoch"]}.pt'))
+            torch.save(value.state_dict(), os.path.join(DIR, folder, f'sgail-ppo-options-setobs2-value-{info["epoch"]}.pt'))
 
     value, policy = gail_ppo(
         env_fn=env_fn,
@@ -84,7 +97,7 @@ def training_function(config):
         value=value,
         v_opt=v_opt,
         v_iters=config['value']['iterations_per_epoch'],
-        epochs=200,
+        epochs=301,
         rollout_episodes=60,
         rollout_steps=60,
         gamma=0.99,
@@ -100,12 +113,17 @@ def training_function(config):
 analysis = tune.run(
     training_function,
     config={
+        'env': {
+            'stop_on_collision': False,
+            'safe_actions_collision_method': 'circle',
+            'abort_unsafe_collision_method': 'circle',
+        },
         'policy': {
             'learning_rate': tune.grid_search([3e-4]),
             'learning_rate_decay': tune.grid_search([1.0]),
             'clip_ratio': tune.grid_search([0.2]),
             'iterations_per_epoch': tune.grid_search([100]),
-            'hidden_layer_size': tune.grid_search([10])
+            'hidden_layer_size': tune.grid_search([25])
         },
         'value': {
             'learning_rate': tune.grid_search([1e-3]),
@@ -114,7 +132,7 @@ analysis = tune.run(
         'discriminator': {
             'learning_rate': tune.grid_search([1e-3]),
             'weight_decay': tune.grid_search([1e-4]),
-            'iterations_per_epoch': tune.grid_search([100]),
+            'iterations_per_epoch': tune.grid_search([500]),
         }
     }
 )
