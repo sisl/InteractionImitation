@@ -76,7 +76,12 @@ def training_function(config):
     value = SetValue() # config net architecture
     v_opt = torch.optim.Adam(value.parameters(), lr=config['value']['learning_rate'])
 
-    discriminator = DeepsetDiscriminator() # config net architecture
+    discriminator = DeepsetDiscriminator(
+        n_hidden_layers_element=config['discriminator']['n_hidden_layers_element'],
+        n_hidden_layers_global=config['discriminator']['n_hidden_layers_global'],
+        hidden_layer_size=config['discriminator']['hidden_layer_size'],
+        activation=config['discriminator']['activation'],
+    )
     disc_opt = torch.optim.Adam(discriminator.parameters(), lr=config['discriminator']['learning_rate'], weight_decay=config['discriminator']['weight_decay'])
 
     expert_data = [
@@ -155,6 +160,10 @@ analysis = tune.run(
             'learning_rate': 1e-3, #tune.grid_search([1e-3]),
             'weight_decay': 1e-4, #tune.grid_search([1e-4]),
             'iterations_per_epoch': 100, #tune.grid_search([100]),
+            'n_hidden_layers_element': 3,
+            'n_hidden_layers_global': 2,
+            'hidden_layer_size': 10,
+            'activation': torch.nn.Tanh,
         },
         'seed': 0,
     }
