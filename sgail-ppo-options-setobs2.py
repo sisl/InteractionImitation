@@ -108,9 +108,9 @@ def training_function(config):
         value=value,
         v_opt=v_opt,
         v_iters=config['value']['iterations_per_epoch'],
-        epochs=2, # 200 FIXME
-        rollout_episodes=6, #60, FIXME
-        rollout_steps=6, #60, FIXME
+        epochs=200,
+        rollout_episodes=60,
+        rollout_steps=60,
         gamma=0.99,
         gae_lambda=0.9,
         clip_ratio=config['policy']['clip_ratio'],
@@ -124,7 +124,6 @@ def training_function(config):
     # save model
     torch.save(policy.state_dict(), 'policy_final.pt')
 
-
 analysis = tune.run(
     training_function,
     config={
@@ -135,7 +134,7 @@ analysis = tune.run(
             'clip_ratio': 0.2, #tune.grid_search([0.2]),
             'iterations_per_epoch': 100, #tune.grid_search([100]),
             'hidden_layer_size': tune.grid_search([10, 20, 40]),
-            'n_hidden_layers': 1, #tune.grid_search([1, 2, 3]), #FIXME
+            'n_hidden_layers': tune.grid_search([2, 3, 4]),
             'activation':tune.grid_search([torch.nn.LeakyReLU, torch.nn.Tanh]),
             'option': tune.grid_search(list(range(len(option_list))))
         },
