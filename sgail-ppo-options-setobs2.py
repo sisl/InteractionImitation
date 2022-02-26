@@ -45,6 +45,7 @@ def training_function(config):
                 speed_reward,
                 collision_penalty=0
             ),
+            check_collisions=True,
             stop_on_collision=config['env']['stop_on_collision'],
         ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
     ), options=[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5), (10, 5)],

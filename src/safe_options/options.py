@@ -47,7 +47,7 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
     logger.add_scalar('expert/mean_reward_per_episode', expert_data.rewards[~expert_data.dones].sum() / expert_data.states.shape[0])
 
     for epoch in tqdm(range(epochs)):
-        hl_data, ll_data = rollout(env_fn, policy, rollout_episodes, rollout_steps)
+        hl_data, ll_data, collisions = rollout(env_fn, policy, rollout_episodes, rollout_steps)
         generator_data = OptionsRollout(HLBuffer(*hl_data), Buffer(*ll_data))
 
         generator_data.ll.actions += 0.1 * torch.randn_like(generator_data.ll.actions)
@@ -56,6 +56,7 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
         gen_mean_reward_per_episode = generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0]
         logger.add_scalar('gen/mean_reward_per_episode', gen_mean_reward_per_episode, epoch)
         logger.add_scalar('gen/unsafe_probability_mass', policy.unsafe_probability_mass(policy(generator_data.hl.states[~generator_data.hl.dones], generator_data.hl.safe_actions[~generator_data.hl.dones])).mean(), epoch)
+        logger.add_scalar('gen/collision_rate', (1. * collisions.any(-1)).mean(), epoch)
 
         discriminator, loss = train_discriminator(expert_data, generator_data.ll, discriminator, disc_opt, disc_iters, wasserstein, wasserstein_c)
         if wasserstein:
@@ -89,7 +90,7 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
     logger.add_scalar('expert/mean_reward_per_episode', expert_data.rewards[~expert_data.dones].sum() / expert_data.states.shape[0])
 
     for epoch in range(epochs):
-        hl_data, ll_data = rollout(env_fn, policy, rollout_episodes, rollout_steps)
+        hl_data, ll_data, collisions = rollout(env_fn, policy, rollout_episodes, rollout_steps)
         generator_data = OptionsRollout(HLBuffer(*hl_data), Buffer(*ll_data))
 
         generator_data.ll.actions += 0.1 * torch.randn_like(generator_data.ll.actions)
@@ -98,6 +99,7 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
         gen_mean_reward_per_episode = generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0]
         logger.add_scalar('gen/mean_reward_per_episode', gen_mean_reward_per_episode, epoch)
         logger.add_scalar('gen/unsafe_probability_mass', policy.unsafe_probability_mass(policy(generator_data.hl.states[~generator_data.hl.dones], generator_data.hl.safe_actions[~generator_data.hl.dones])).mean(), epoch)
+        logger.add_scalar('gen/collision_rate', (1. * collisions.any(-1)).mean(), epoch)
 
         discriminator, loss = train_discriminator(expert_data, generator_data.ll, discriminator, disc_opt, disc_iters, wasserstein, wasserstein_c)
         if wasserstein:
@@ -134,6 +136,7 @@ def rollout(env_fn, policy, n_episodes, max_steps_per_episode):
     actions = torch.zeros(n_episodes, max_steps_per_episode + 1, *env.action_space.shape)
     rewards = torch.zeros(n_episodes, max_steps_per_episode + 1)
     dones = torch.ones(n_episodes, max_steps_per_episode + 1, dtype=bool)
+    collisions = torch.zeros(n_episodes, max_steps_per_episode, dtype=bool)
 
     ll_states = torch.zeros(n_episodes, max_steps_per_episode, env.max_plan_length + 1, *env.observation_space['observation'].shape)
     ll_actions = torch.zeros(n_episodes, max_steps_per_episode, env.max_plan_length + 1, *env.ll_action_space.shape)
@@ -159,6 +162,9 @@ def rollout(env_fn, policy, n_episodes, max_steps_per_episode):
         safe_actions[:, s + 1] = torch.tensor(o['safe_actions']).clone().detach()
         rewards[:, s] = torch.tensor(r).clone().detach()
         dones[:, s + 1] = torch.tensor(d).clone().detach()
+        collisions[:, s] = torch.from_numpy(np.stack([
+            any(k['collision'] for k in i['ll']['infos']) for i in info
+        ])).detach().clone()
 
         ll_states[:, s] = torch.from_numpy(np.stack([i['ll']['observations'] for i in info])).clone().detach()
         ll_actions[:, s] = torch.from_numpy(np.stack([i['ll']['actions'] for i in info])).clone().detach()
@@ -173,7 +179,7 @@ def rollout(env_fn, policy, n_episodes, max_steps_per_episode):
     rewards = rewards[:, :max_steps_per_episode]
     dones = dones[:, :max_steps_per_episode]
 
-    return (states, safe_actions, actions, rewards, dones), (ll_states, ll_actions, ll_rewards, ll_dones)
+    return (states, safe_actions, actions, rewards, dones), (ll_states, ll_actions, ll_rewards, ll_dones), collisions
 
 class SafeOptionsEnv(OptionsEnv):
 
