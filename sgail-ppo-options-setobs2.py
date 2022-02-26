@@ -92,6 +92,11 @@ def training_function(config):
         tune.report(gen_mean_reward_per_episode=info['gen/mean_reward_per_episode'],
                     disc_mean_reward_per_episode=info['disc/mean_reward_per_episode'], 
                     mean_episode_length=info['gen/mean_episode_length'])
+        
+        # save model checkpoints
+        ep = info['epoch'] + 1
+        if (ep % 25 == 0):
+            torch.save(info['policy'].state_dict(), f'policy_epoch{ep}.pt')
 
     value, policy = gail_ppo(
         env_fn=env_fn,
@@ -116,7 +121,8 @@ def training_function(config):
         lr_schedulers=[pi_lr_scheduler],
     )
 
-    # save value, policy
+    # save model
+    torch.save(policy.state_dict(), 'policy_final.pt')
 
 
 analysis = tune.run(
