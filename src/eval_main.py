@@ -37,21 +37,22 @@ def load_policy(method:str,
     Returns:
         policy (Optional[BaseAlgorithm]): the policy to evaluate
     """
+    ml = torch.device('cpu') if not torch.cuda.is_available() else None
     if method == 'idm':
         policy = IDMRulePolicy(env, **policy_kwargs)
     elif method == 'bc':
         policy = SetPolicy(env.action_space.shape[-1])
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'gail':
         policy = SetPolicy(env.action_space.shape[-1])
         policy(torch.zeros(env.observation_space.shape))
         policy = ReparamPolicy(policy)
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'gail-ppo':
         policy = SetPolicy(env.action_space.shape[-1])
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'rail':
         raise NotImplementedError
@@ -59,11 +60,11 @@ def load_policy(method:str,
         policy = SetDiscretePolicy(env.action_space.n)
         policy(torch.zeros(env.observation_space.shape))
         policy = ReparamPolicy(policy)
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'ogail-ppo':
         policy = SetDiscretePolicy(env.action_space.n)
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'sgail':
         policy = SetMaskedDiscretePolicy(env.action_space.n)
@@ -72,11 +73,11 @@ def load_policy(method:str,
             torch.zeros(env.observation_space['safe_actions'].shape)
         )
         policy = ReparamSafePolicy(policy)
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'sgail-ppo':
         policy = SetMaskedDiscretePolicy(env.action_space.n)
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     else:
         raise NotImplementedError

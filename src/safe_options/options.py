@@ -52,7 +52,8 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
 
         generator_data.ll.actions += 0.1 * torch.randn_like(generator_data.ll.actions)
 
-        logger.add_scalar('gen/mean_episode_length', (~generator_data.ll.dones).sum() / generator_data.ll.states.shape[0], epoch)
+        gen_mean_episode_length = (~generator_data.ll.dones).sum() / generator_data.ll.states.shape[0]
+        logger.add_scalar('gen/mean_episode_length', gen_mean_episode_length , epoch)
         gen_mean_reward_per_episode = generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0]
         logger.add_scalar('gen/mean_reward_per_episode', gen_mean_reward_per_episode, epoch)
         logger.add_scalar('gen/unsafe_probability_mass', policy.unsafe_probability_mass(policy(generator_data.hl.states[~generator_data.hl.dones], generator_data.hl.safe_actions[~generator_data.hl.dones])).mean(), epoch)
@@ -64,7 +65,8 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
         else:
             generator_data.ll.rewards = -F.logsigmoid(discriminator(generator_data.ll.states, generator_data.ll.actions))
         logger.add_scalar('disc/final_loss', loss, epoch)
-        logger.add_scalar('disc/mean_reward_per_episode', generator_data.ll.rewards[~generator_data.ll.dones].sum() / generator_data.ll.states.shape[0], epoch)
+        disc_mean_reward_per_episode = generator_data.ll.rewards[~generator_data.ll.dones].sum() / generator_data.ll.states.shape[0]
+        logger.add_scalar('disc/mean_reward_per_episode', disc_mean_reward_per_episode , epoch)
 
         #assert generator_data.ll.rewards.shape == generator_data.ll.dones.shape
         generator_data.hl.rewards = torch.where(~generator_data.ll.dones, generator_data.ll.rewards, torch.tensor(0.)).sum(-1)
@@ -77,7 +79,9 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
                 'epoch': epoch,
                 'value': value,
                 'policy': policy,
-                'gen/mean_reward_per_episode': gen_mean_reward_per_episode,
+                'gen/mean_episode_length': gen_mean_episode_length.item(),
+                'gen/mean_reward_per_episode': gen_mean_reward_per_episode.item(),
+                'disc/mean_reward_per_episode': disc_mean_reward_per_episode.item(),
             })
     
     return value, policy
@@ -94,8 +98,8 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
         generator_data = OptionsRollout(HLBuffer(*hl_data), Buffer(*ll_data))
 
         generator_data.ll.actions += 0.1 * torch.randn_like(generator_data.ll.actions)
-
-        logger.add_scalar('gen/mean_episode_length', (~generator_data.ll.dones).sum() / generator_data.ll.states.shape[0], epoch)
+        gen_mean_episode_length = (~generator_data.ll.dones).sum() / generator_data.ll.states.shape[0]
+        logger.add_scalar('gen/mean_episode_length', gen_mean_episode_length, epoch)
         gen_mean_reward_per_episode = generator_data.hl.rewards[~generator_data.hl.dones].sum() / generator_data.hl.states.shape[0]
         logger.add_scalar('gen/mean_reward_per_episode', gen_mean_reward_per_episode, epoch)
         logger.add_scalar('gen/unsafe_probability_mass', policy.unsafe_probability_mass(policy(generator_data.hl.states[~generator_data.hl.dones], generator_data.hl.safe_actions[~generator_data.hl.dones])).mean(), epoch)
@@ -107,7 +111,8 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
         else:
             generator_data.ll.rewards = -F.logsigmoid(discriminator(generator_data.ll.states, generator_data.ll.actions))
         logger.add_scalar('disc/final_loss', loss, epoch)
-        logger.add_scalar('disc/mean_reward_per_episode', generator_data.ll.rewards[~generator_data.ll.dones].sum() / generator_data.ll.states.shape[0], epoch)
+        disc_mean_reward_per_episode = generator_data.ll.rewards[~generator_data.ll.dones].sum() / generator_data.ll.states.shape[0]
+        logger.add_scalar('disc/mean_reward_per_episode', disc_mean_reward_per_episode, epoch)
         
         #assert generator_data.ll.rewards.shape == generator_data.ll.dones.shape
         generator_data.hl.rewards = torch.where(~generator_data.ll.dones, generator_data.ll.rewards, torch.tensor(0.)).sum(-1)
@@ -120,7 +125,9 @@ def gail_ppo(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, v
                 'epoch': epoch,
                 'value': value,
                 'policy': policy,
-                'gen/mean_reward_per_episode': gen_mean_reward_per_episode,
+                'gen/mean_episode_length': gen_mean_episode_length.item(),
+                'gen/mean_reward_per_episode': gen_mean_reward_per_episode.item(),
+                'disc/mean_reward_per_episode': disc_mean_reward_per_episode.item(),
             })
     
     for lr_scheduler in lr_schedulers:
@@ -248,9 +255,9 @@ class SafeOptionsEnv(OptionsEnv):
             if d:
                 break
 
-            if self.abort_unsafe_collision_method is not None and \
-                not feasible(self.env, plan[k:], method=self.abort_unsafe_collision_method):
-                break
+            if self.abort_unsafe_collision_method is not None:
+                if not feasible(self.env, plan[k:], method=self.abort_unsafe_collision_method):
+                    break
         
         n_steps = k + 1
         return observations, actions, rewards, env_done, plan_done, infos, n_steps

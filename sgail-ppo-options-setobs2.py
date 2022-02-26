@@ -6,7 +6,8 @@ from src.safe_options.options import gail_ppo, Buffer
 from src.core.value import SetValue
 from src.safe_options.policy import SetMaskedDiscretePolicy
 from src.core.discriminator import DeepsetDiscriminator
-import torch.optim
+import torch
+
 from intersim.envs import IntersimpleLidarFlatRandom
 from intersim.envs.intersimple import speed_reward
 import functools
@@ -18,27 +19,38 @@ from ray import tune
 from datetime import datetime
 import json
 
+DIR = os.path.dirname(os.path.abspath(__file__))
+option_list = [[(vel, time) for vel in [0, 1, 2, 4, 6, 8, 10] for time in [5]],
+                [(vel, time) for vel in [0, 1, 2, 5, 7.5, 10] for time in [5, 20]],
+                [(vel, time) for vel in [0, 1, 2, 4, 6, 8, 10] for time in [5, 10, 20]], # was the best in training with single hidden layer, but very slow
+                [(vel, time) for vel in [0, 1, 2, 5, 7.5, 10] for time in [5, 20, 40]], 
+                [(vel, time) for vel in [0, 2, 5, 10] for time in [5, 10, 20]],
+                [(vel, time) for vel in [0, 3, 10] for time in [5, 20, 40]]
+]
+
+obs_min = np.array([
+    [-1000, -1000, 0, -np.pi, -1e-1, 0.],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+    [0, -np.pi, -20, -20, -np.pi, -1e-1],
+]).reshape(-1)
+
+obs_max = np.array([
+    [1000, 1000, 20, np.pi, 1e-1, 0.],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+    [50, np.pi, 20, 20, np.pi, 1e-1],
+]).reshape(-1)
+
 def training_function(config):
-    DIR = os.path.dirname(os.path.abspath(__file__))
-    obs_min = np.array([
-        [-1000, -1000, 0, -np.pi, -1e-1, 0.],
-        [0, -np.pi, -20, -20, -np.pi, -1e-1],
-        [0, -np.pi, -20, -20, -np.pi, -1e-1],
-        [0, -np.pi, -20, -20, -np.pi, -1e-1],
-        [0, -np.pi, -20, -20, -np.pi, -1e-1],
-        [0, -np.pi, -20, -20, -np.pi, -1e-1],
-    ]).reshape(-1)
+    np.random.seed(config['seed'])
+    torch.manual_seed(config['seed'])
 
-    obs_max = np.array([
-        [1000, 1000, 20, np.pi, 1e-1, 0.],
-        [50, np.pi, 20, 20, np.pi, 1e-1],
-        [50, np.pi, 20, 20, np.pi, 1e-1],
-        [50, np.pi, 20, 20, np.pi, 1e-1],
-        [50, np.pi, 20, 20, np.pi, 1e-1],
-        [50, np.pi, 20, 20, np.pi, 1e-1],
-    ]).reshape(-1)
-
-    envs = [SafeOptionsEnv(Setobs(
+    envs = sum([[SafeOptionsEnv(Setobs(
         TransformObservation(CollisionPenaltyWrapper(IntersimpleLidarFlatRandom(
             n_rays=5,
             reward=functools.partial(
@@ -46,15 +58,18 @@ def training_function(config):
                 collision_penalty=0
             ),
             check_collisions=True,
-            stop_on_collision=config['env']['stop_on_collision'],
+            stop_on_collision=config['env']['stop_on_collision'], track=track,
         ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
-    ), options=[(0, 5), (1, 5), (2, 5), (4, 5), (6, 5), (8, 5), (10, 5)],
-        safe_actions_collision_method=config['env']['safe_actions_collision_method'],
-        abort_unsafe_collision_method=config['env']['abort_unsafe_collision_method']) for _ in range(60)]
+    ), options=option_list[config['policy']['option']],
+        safe_actions_collision_method=config['env']['safe_actions_collision_method'], 
+        abort_unsafe_collision_method=config['env']['abort_unsafe_collision_method']) for _ in range(20)] for track in range(4)],[])
 
     env_fn = lambda i: envs[i]
 
-    policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n, hidden_layer_size=config['policy']['hidden_layer_size']) # config net architecture
+    policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n, 
+        n_hidden_layers=config['policy']['n_hidden_layers'],
+        hidden_layer_size=config['policy']['hidden_layer_size'],
+        activation=config['policy']['activation'] ) # config net architecture
     pi_opt = torch.optim.Adam(policy.parameters(), lr=config['policy']['learning_rate'])
     pi_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(pi_opt, gamma=config['policy']['learning_rate_decay'])
 
@@ -77,16 +92,20 @@ def training_function(config):
     expert_data = (torch.cat(d0), torch.cat(d1), torch.cat(d2), torch.cat(d3))
     expert_data = Buffer(*expert_data)
 
-    folder = str(datetime.now())
-    os.mkdir(os.path.join(DIR, folder))
-    with open(os.path.join(DIR, folder, 'config.json'), 'w') as f:
+    run_folder = str(datetime.now())
+    os.mkdir(os.path.join(DIR, run_folder))
+    with open(os.path.join(DIR, run_folder, 'config.json'), 'w') as f:
         json.dump(config, f, indent=4)
 
     def callback(info):
-        tune.report(gen_mean_reward_per_episode=info['gen/mean_reward_per_episode'])
-        if not info['epoch'] % 10:
-            torch.save(policy.state_dict(), os.path.join(DIR, folder, f'sgail-ppo-options-setobs2-{info["epoch"]}.pt'))
-            torch.save(value.state_dict(), os.path.join(DIR, folder, f'sgail-ppo-options-setobs2-value-{info["epoch"]}.pt'))
+        tune.report(gen_mean_reward_per_episode=info['gen/mean_reward_per_episode'],
+                    disc_mean_reward_per_episode=info['disc/mean_reward_per_episode'], 
+                    mean_episode_length=info['gen/mean_episode_length'])
+        
+        # save model checkpoints
+        ep = info['epoch'] + 1
+        if (ep % 25 == 0):
+            torch.save(info['policy'].state_dict(), os.path.join(DIR, run_folder, f'policy_epoch{ep}.pt'))
 
     value, policy = gail_ppo(
         env_fn=env_fn,
@@ -111,6 +130,9 @@ def training_function(config):
         lr_schedulers=[pi_lr_scheduler],
     )
 
+    # save model
+    torch.save(policy.state_dict(), 'policy_final.pt')
+
 analysis = tune.run(
     training_function,
     config={
@@ -120,21 +142,25 @@ analysis = tune.run(
             'abort_unsafe_collision_method': 'circle',
         },
         'policy': {
-            'learning_rate': tune.grid_search([3e-4]),
-            'learning_rate_decay': tune.grid_search([1.0]),
-            'clip_ratio': tune.grid_search([0.2]),
-            'iterations_per_epoch': tune.grid_search([100]),
-            'hidden_layer_size': tune.grid_search([25])
+            'learning_rate': 3e-4, # tune.grid_search([3e-4]),
+            'learning_rate_decay': 1.0, #tune.grid_search([1.0]),
+            'clip_ratio': 0.2, #tune.grid_search([0.2]),
+            'iterations_per_epoch': 100, #tune.grid_search([100]),
+            'hidden_layer_size': tune.grid_search([10, 20, 40]),
+            'n_hidden_layers': tune.grid_search([2, 3, 4]),
+            'activation':tune.grid_search([torch.nn.LeakyReLU, torch.nn.Tanh]),
+            'option': tune.grid_search(list(range(len(option_list))))
         },
         'value': {
-            'learning_rate': tune.grid_search([1e-3]),
-            'iterations_per_epoch': tune.grid_search([1000]),
+            'learning_rate': 1e-3, # tune.grid_search([1e-3]),
+            'iterations_per_epoch': 1000, #tune.grid_search([1000]),
         },
         'discriminator': {
-            'learning_rate': tune.grid_search([1e-3]),
-            'weight_decay': tune.grid_search([1e-4]),
-            'iterations_per_epoch': tune.grid_search([500]),
-        }
+            'learning_rate': 1e-3, #tune.grid_search([1e-3]),
+            'weight_decay': 1e-4, #tune.grid_search([1e-4]),
+            'iterations_per_epoch': 100, #tune.grid_search([100]),
+        },
+        'seed': 0,
     }
 )
 
