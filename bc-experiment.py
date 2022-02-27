@@ -44,7 +44,7 @@ def training_function(config):
     np.random.seed(config['seed'])
     torch.manual_seed(config['seed'])
 
-    env = Setobs(TransformObservation(CollisionPenaltyWrapper(
+    envs = [Setobs(TransformObservation(CollisionPenaltyWrapper(
         IntersimpleLidarFlatRandom(
             n_rays=5,
             reward=functools.partial(
@@ -55,8 +55,8 @@ def training_function(config):
             stop_on_collision=config['trainenv']['stop_on_collision'],
         ), collision_distance=6, collision_penalty=100),
         lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10)
-    ))
-    env_fn = lambda i: env
+    )) for _ in range(60)]
+    env_fn = lambda i: envs[i]
 
     # load expert data
 
