@@ -142,8 +142,8 @@ def training_function(config):
         v_opt=v_opt,
         v_iters=config['value']['iterations_per_epoch'],
         epochs=config['train_epochs'],
-        rollout_episodes=6, #60, FIXME 
-        rollout_steps=6, #60, FIXME
+        rollout_episodes=60, 
+        rollout_steps=60,
         gamma=0.99,
         gae_lambda=0.9,
         clip_ratio=config['policy']['clip_ratio'],
@@ -160,19 +160,22 @@ def training_function(config):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('experiment', choices=['A', 'B'])
+    parser.add_argument('--train', choices=['A', 'B'])
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--test', type=str, help='path to config file to run final training on')
     parser.add_argument('--test_seeds', type=int, default=5)
+    parser.add_argument('--test_cpus', type=int, help='number of cpus available to split test seed training over')
     args = parser.parse_args()
+
+    assert (args.train is None) ^ (args.test is None), 'Must either train on an experiment or test with a config file'
 
     # if no test config specified, train
     if args.test is None:
-        print('Running Tuning for Experiment %s'%(args.experiment))
+        print('Running Tuning for Experiment %s'%(args.train))
         analysis = tune.run(
             training_function,
             config={
-                'experiment': args.experiment,
+                'experiment': args.train,
                 'trainenv': {
                     'stop_on_collision': False, 
                     'safe_actions_collision_method': 'circle', 
@@ -213,13 +216,13 @@ if __name__ == '__main__':
             os.mkdir(os.path.join(DIR, 'best_configs'))
         
         # save shail
-        with open(os.path.join(DIR, 'best_configs',f'shail_exp{args.experiment}.json'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(DIR, 'best_configs',f'shail_exp{args.train}.json'), 'w', encoding='utf-8') as f:
             json.dump(best_config, f, ensure_ascii=False, indent=4)
 
         # save hail
         best_config['trainenv']['safe_actions_collision_method']=None
         best_config['trainenv']['abort_unsafe_collision_method']=None
-        with open(os.path.join(DIR, 'best_configs',f'hail_exp{args.experiment}.json'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(DIR, 'best_configs',f'hail_exp{args.train}.json'), 'w', encoding='utf-8') as f:
             json.dump(best_config, f, ensure_ascii=False, indent=4)
     
     # if config file specified, rerun it with appropriate number of seeds
@@ -227,13 +230,25 @@ if __name__ == '__main__':
         with open(args.test, 'rb') as f:
             config = json.load(f)
 
-        print(f'Retraining {args.test} with {args.test_seed} seeds on experiment {config["experiment"]}')
+        print(f'Retraining {args.test} with {args.test_seeds} seeds on experiment {config["experiment"]}')
 
         # rerun with appropriate number of seeds
+        rpt = {'cpu': int(args.test_cpus/args.test_seeds)} if (args.test_cpus is not None) else None
         config['seed'] = tune.grid_search(list(range(1,args.test_seeds+1)))
-        analysis = tune.run(training_function, config)
+        analysis = tune.run(training_function, config=config, resources_per_trial=rpt)
 
         # move final policies to appropriate directory
-        # import pdb
-        # pdb.set_trace()
-        # a = 0
+        split_ = os.path.basename(args.test).split('_')
+        model = split_[0]
+        exper = split_[-1].split('.')[0]
+        savepath = os.path.join('test_policies',model,exper)
+        
+        if not os.path.isdir(savepath):
+            os.makedirs(savepath)
+        
+        import shutil
+        for i in range(args.test_seeds):
+            s = analysis._checkpoints[i]['config']['seed']
+            check_dir = analysis._checkpoints[i]['logdir']
+            shutil.copyfile(os.path.join(check_dir,'policy_final.pt'), 
+                os.path.join(savepath, f'policy_seed{s}.pt'))
