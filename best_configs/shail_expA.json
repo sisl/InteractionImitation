@@ -11,7 +11,7 @@
         "clip_ratio": 0.2,
         "iterations_per_epoch": 100,
         "hidden_layer_size": 20,
-        "n_hidden_layers": 2,
+        "n_hidden_layers": 4,
         "activation": 0,
         "option": 0
     },
@@ -24,10 +24,10 @@
         "weight_decay": 0.0001,
         "iterations_per_epoch": 100,
         "n_hidden_layers_element": 3,
-        "n_hidden_layers_global": 1,
+        "n_hidden_layers_global": 2,
         "hidden_layer_size": 10,
         "activation": 0
     },
-    "train_epochs": 2,
+    "train_epochs": 100,
     "seed": 0
 }
