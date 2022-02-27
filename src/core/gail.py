@@ -38,7 +38,7 @@ def gail(env_fn, expert_data, discriminator, disc_opt, disc_iters, policy, value
     logger.add_scalar('expert/mean_episode_length', (~expert_data.dones).sum() / expert_data.states.shape[0])
     logger.add_scalar('expert/mean_reward_per_episode', expert_data.rewards[~expert_data.dones].sum() / expert_data.states.shape[0])
 
-    for epoch in tqdm(range(epochs)):
+    for epoch in range(epochs):
         states, actions, rewards, dones, collisions = rollout(env_fn, policy, rollout_episodes, rollout_steps)
         generator_data = Buffer(states, actions, rewards, dones)
 
