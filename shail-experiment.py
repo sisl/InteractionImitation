@@ -142,8 +142,8 @@ def training_function(config):
         v_opt=v_opt,
         v_iters=config['value']['iterations_per_epoch'],
         epochs=config['train_epochs'],
-        rollout_episodes=60, 
-        rollout_steps=60, 
+        rollout_episodes=6, #60, FIXME 
+        rollout_steps=6, #60, FIXME
         gamma=0.99,
         gae_lambda=0.9,
         clip_ratio=config['policy']['clip_ratio'],
@@ -162,44 +162,78 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('experiment', choices=['A', 'B'])
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--test', type=str, help='path to config file to run final training on')
+    parser.add_argument('--test_seeds', type=int, default=5)
     args = parser.parse_args()
-    
 
-    print('Running Tuning for Experiment %s'%(args.experiment))
-    analysis = tune.run(
-        training_function,
-        config={
-            'experiment': args.experiment,
-            'trainenv': {
-                'stop_on_collision': False, 
-                'safe_actions_collision_method': 'circle', 
-                'abort_unsafe_collision_method': 'circle',
-            },
-            'policy': {
-                'learning_rate': 3e-4, 
-                'learning_rate_decay': 1.0, 
-                'clip_ratio': 0.2, 
-                'iterations_per_epoch': 100,
-                'hidden_layer_size': tune.grid_search([20, 40]),
-                'n_hidden_layers': tune.grid_search([2, 3]), 
-                'activation':0,
-                'option': tune.grid_search(list(range(len(option_list))))
-            },
-            'value': {
-                'learning_rate': 1e-3, 
-                'iterations_per_epoch': 1000, 
-            },
-            'discriminator': {
-                'learning_rate': 1e-3, 
-                'weight_decay': 1e-4, 
-                'iterations_per_epoch': 100, 
-                'n_hidden_layers_element': tune.grid_search([3,4]),
-                'n_hidden_layers_global': tune.grid_search([1,2]),
-                'hidden_layer_size': 10, 
-                'activation': 0,
-            },
-            'train_epochs': args.epochs,
-            'seed': 0,
-        }
-    )
-    print('Best config: ', analysis.get_best_config(metric='gen_collision_rate', mode='min'))
+    # if no test config specified, train
+    if args.test is None:
+        print('Running Tuning for Experiment %s'%(args.experiment))
+        analysis = tune.run(
+            training_function,
+            config={
+                'experiment': args.experiment,
+                'trainenv': {
+                    'stop_on_collision': False, 
+                    'safe_actions_collision_method': 'circle', 
+                    'abort_unsafe_collision_method': 'circle',
+                },
+                'policy': {
+                    'learning_rate': 3e-4, 
+                    'learning_rate_decay': 1.0, 
+                    'clip_ratio': 0.2, 
+                    'iterations_per_epoch': 100,
+                    'hidden_layer_size': tune.grid_search([20, 40]),
+                    'n_hidden_layers': tune.grid_search([2, 3]), 
+                    'activation':0,
+                    'option': tune.grid_search(list(range(len(option_list))))
+                },
+                'value': {
+                    'learning_rate': 1e-3, 
+                    'iterations_per_epoch': 1000, 
+                },
+                'discriminator': {
+                    'learning_rate': 1e-3, 
+                    'weight_decay': 1e-4, 
+                    'iterations_per_epoch': 100, 
+                    'n_hidden_layers_element': tune.grid_search([3,4]),
+                    'n_hidden_layers_global': tune.grid_search([1,2]),
+                    'hidden_layer_size': 10, 
+                    'activation': 0,
+                },
+                'train_epochs': args.epochs,
+                'seed': 0,
+            }
+        )
+        best_config = analysis.get_best_config(metric='gen_collision_rate', mode='min')
+        print('Best config: ', best_config)
+
+        # safe best_config
+        if not os.path.isdir(os.path.join(DIR, 'best_configs')):
+            os.mkdir(os.path.join(DIR, 'best_configs'))
+        
+        # save shail
+        with open(os.path.join(DIR, 'best_configs',f'shail_exp{args.experiment}.json'), 'w', encoding='utf-8') as f:
+            json.dump(best_config, f, ensure_ascii=False, indent=4)
+
+        # save hail
+        best_config['trainenv']['safe_actions_collision_method']=None
+        best_config['trainenv']['abort_unsafe_collision_method']=None
+        with open(os.path.join(DIR, 'best_configs',f'hail_exp{args.experiment}.json'), 'w', encoding='utf-8') as f:
+            json.dump(best_config, f, ensure_ascii=False, indent=4)
+    
+    # if config file specified, rerun it with appropriate number of seeds
+    else:
+        with open(args.test, 'rb') as f:
+            config = json.load(f)
+
+        print(f'Retraining {args.test} with {args.test_seed} seeds on experiment {config["experiment"]}')
+
+        # rerun with appropriate number of seeds
+        config['seed'] = tune.grid_search(list(range(1,args.test_seeds+1)))
+        analysis = tune.run(training_function, config)
+
+        # move final policies to appropriate directory
+        # import pdb
+        # pdb.set_trace()
+        # a = 0
