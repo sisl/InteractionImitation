@@ -21,11 +21,10 @@ import json
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 option_list = [[(vel, time) for vel in [0, 1, 2, 4, 6, 8, 10] for time in [5]],
-                [(vel, time) for vel in [0, 1, 2, 5, 7.5, 10] for time in [5, 20]],
-                [(vel, time) for vel in [0, 1, 2, 4, 6, 8, 10] for time in [5, 10, 20]], # was the best in training with single hidden layer, but very slow
-                [(vel, time) for vel in [0, 1, 2, 5, 7.5, 10] for time in [5, 20, 40]], 
-                [(vel, time) for vel in [0, 2, 5, 10] for time in [5, 10, 20]],
-                [(vel, time) for vel in [0, 3, 10] for time in [5, 20, 40]]
+                [(vel, time) for vel in [0, 2.5, 5, 7.5, 10] for time in [5, 10]],
+                [(vel, time) for vel in [0, 2.5, 5, 7.5, 10] for time in [5, 20]],
+                [(vel, time) for vel in [0, 2.5, 5, 10] for time in [5, 10, 20]],
+                [(vel, time) for vel in [0, 3, 10] for time in [5, 10, 20]]
 ]
 
 obs_min = np.array([
@@ -58,11 +57,12 @@ def training_function(config):
                 collision_penalty=0
             ),
             check_collisions=True,
-            stop_on_collision=config['env']['stop_on_collision'], track=track,
+            stop_on_collision=config['trainenv']['stop_on_collision'], track=track,
         ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
-    ), options=option_list[config['policy']['option']],
-        safe_actions_collision_method=config['env']['safe_actions_collision_method'], 
-        abort_unsafe_collision_method=config['env']['abort_unsafe_collision_method']) for _ in range(20)] for track in range(4)],[])
+        ), options=option_list[config['policy']['option']],
+        safe_actions_collision_method=config['trainenv']['safe_actions_collision_method'], 
+        abort_unsafe_collision_method=config['trainenv']['abort_unsafe_collision_method'],
+        ) for _ in range(20)] for track in range(4)],[])
 
     env_fn = lambda i: envs[i]
 
@@ -118,9 +118,9 @@ def training_function(config):
         value=value,
         v_opt=v_opt,
         v_iters=config['value']['iterations_per_epoch'],
-        epochs=301,
+        epochs=20, #300, #200 FIXME
         rollout_episodes=60,
-        rollout_steps=60,
+        rollout_steps=60, 
         gamma=0.99,
         gae_lambda=0.9,
         clip_ratio=config['policy']['clip_ratio'],
@@ -137,19 +137,19 @@ def training_function(config):
 analysis = tune.run(
     training_function,
     config={
-        'env': {
-            'stop_on_collision': False,
-            'safe_actions_collision_method': 'circle',
-            'abort_unsafe_collision_method': 'circle',
+        'trainenv': {
+            'stop_on_collision': False, #tune.grid_search([False, True]),
+            'safe_actions_collision_method': 'circle', 
+            'abort_unsafe_collision_method': 'circle', 
         },
         'policy': {
             'learning_rate': 3e-4, # tune.grid_search([3e-4]),
             'learning_rate_decay': 1.0, #tune.grid_search([1.0]),
             'clip_ratio': 0.2, #tune.grid_search([0.2]),
             'iterations_per_epoch': 100, #tune.grid_search([100]),
-            'hidden_layer_size': tune.grid_search([10, 20, 40]),
-            'n_hidden_layers': tune.grid_search([2, 3, 4]),
-            'activation':tune.grid_search([torch.nn.LeakyReLU, torch.nn.Tanh]),
+            'hidden_layer_size': 10, #tune.grid_search([10, 20, 40]), FIXME
+            'n_hidden_layers': 2, #tune.grid_search([2, 3, 4]), FIXME
+            'activation':torch.nn.Tanh,
             'option': tune.grid_search(list(range(len(option_list))))
         },
         'value': {
