@@ -170,8 +170,6 @@ if __name__ == '__main__':
                 'experiment': args.train,
                 'trainenv': {
                     'stop_on_collision': False, 
-                    'safe_actions_collision_method': 'circle', 
-                    'abort_unsafe_collision_method': 'circle',
                 },
                 'policy': {
                     'learning_rate': 3e-4, 
