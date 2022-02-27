@@ -21,11 +21,10 @@ import json
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 option_list = [[(vel, time) for vel in [0, 1, 2, 4, 6, 8, 10] for time in [5]],
-                [(vel, time) for vel in [0, 2.5, 5, 7.5, 10] for time in [5, 10]],
-                [(vel, time) for vel in [0, 2.5, 5, 7.5, 10] for time in [5, 20]],
-                [(vel, time) for vel in [0, 2.5, 5, 10] for time in [5, 10, 20]],
+                [(vel, time) for vel in [0, 1, 2, 5, 7.5, 10] for time in [5, 10]],
                 [(vel, time) for vel in [0, 3, 10] for time in [5, 10, 20]]
 ]
+activations = [torch.nn.Tanh, torch.nn.LeakyReLU]
 
 obs_min = np.array([
     [-1000, -1000, 0, -np.pi, -1e-1, 0.],
@@ -49,27 +48,47 @@ def training_function(config):
     np.random.seed(config['seed'])
     torch.manual_seed(config['seed'])
 
-    envs = sum([[SafeOptionsEnv(Setobs(
-        TransformObservation(CollisionPenaltyWrapper(IntersimpleLidarFlatRandom(
-            n_rays=5,
-            reward=functools.partial(
-                speed_reward,
-                collision_penalty=0
-            ),
-            check_collisions=True,
-            stop_on_collision=config['trainenv']['stop_on_collision'], track=track,
-        ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
-        ), options=option_list[config['policy']['option']],
-        safe_actions_collision_method=config['trainenv']['safe_actions_collision_method'], 
-        abort_unsafe_collision_method=config['trainenv']['abort_unsafe_collision_method'],
-        ) for _ in range(20)] for track in range(4)],[])
+    if config['experiment'] == 'A':
+        envs = [SafeOptionsEnv(Setobs(
+            TransformObservation(CollisionPenaltyWrapper(IntersimpleLidarFlatRandom(
+                n_rays=5,
+                reward=functools.partial(
+                    speed_reward,
+                    collision_penalty=0
+                ),
+                check_collisions=True,
+                stop_on_collision=config['trainenv']['stop_on_collision'],
+            ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
+            ), options=option_list[config['policy']['option']],
+            safe_actions_collision_method=config['trainenv']['safe_actions_collision_method'], 
+            abort_unsafe_collision_method=config['trainenv']['abort_unsafe_collision_method'],
+            ) for _ in range(60)]
+
+    elif config['experiment'] == 'B': 
+        envs = sum([[SafeOptionsEnv(Setobs(
+            TransformObservation(CollisionPenaltyWrapper(IntersimpleLidarFlatRandom(
+                n_rays=5,
+                reward=functools.partial(
+                    speed_reward,
+                    collision_penalty=0
+                ),
+                check_collisions=True,
+                stop_on_collision=config['trainenv']['stop_on_collision'], track=track,
+            ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
+            ), options=option_list[config['policy']['option']],
+            safe_actions_collision_method=config['trainenv']['safe_actions_collision_method'], 
+            abort_unsafe_collision_method=config['trainenv']['abort_unsafe_collision_method'],
+            ) for _ in range(15)] for track in range(4)],[])
+    
+    else:
+        raise NotImplementedError
 
     env_fn = lambda i: envs[i]
 
     policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n, 
         n_hidden_layers=config['policy']['n_hidden_layers'],
         hidden_layer_size=config['policy']['hidden_layer_size'],
-        activation=config['policy']['activation'] ) # config net architecture
+        activation=activations[config['policy']['activation']] ) # config net architecture
     pi_opt = torch.optim.Adam(policy.parameters(), lr=config['policy']['learning_rate'])
     pi_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(pi_opt, gamma=config['policy']['learning_rate_decay'])
 
@@ -80,21 +99,25 @@ def training_function(config):
         n_hidden_layers_element=config['discriminator']['n_hidden_layers_element'],
         n_hidden_layers_global=config['discriminator']['n_hidden_layers_global'],
         hidden_layer_size=config['discriminator']['hidden_layer_size'],
-        activation=config['discriminator']['activation'],
+        activation=activations[config['discriminator']['activation']],
     )
     disc_opt = torch.optim.Adam(discriminator.parameters(), lr=config['discriminator']['learning_rate'], weight_decay=config['discriminator']['weight_decay'])
 
-    expert_data = [
-        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track0.pt')),
-        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track1.pt')),
-        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track2.pt')),
-        torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track3.pt')),
-    ]
-    d0 = [d[0] for d in expert_data]
-    d1 = [d[1] for d in expert_data]
-    d2 = [d[2] for d in expert_data]
-    d3 = [d[3] for d in expert_data]
-    expert_data = (torch.cat(d0), torch.cat(d1), torch.cat(d2), torch.cat(d3))
+    if config['experiment'] == 'A': 
+        expert_data = torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track0.pt'))
+    elif config['experiment'] == 'B': 
+        expert_data = [
+            torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track0.pt')),
+            torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track1.pt')),
+            torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track2.pt')),
+            torch.load(os.path.join(DIR, 'intersimple-expert-data-setobs2-loc0-track3.pt')),
+        ]
+        d0 = [d[0] for d in expert_data]
+        d1 = [d[1] for d in expert_data]
+        d2 = [d[2] for d in expert_data]
+        d3 = [d[3] for d in expert_data]
+        expert_data = (torch.cat(d0), torch.cat(d1), torch.cat(d2), torch.cat(d3))
+    
     expert_data = Buffer(*expert_data)
 
     def callback(info):
@@ -118,8 +141,8 @@ def training_function(config):
         value=value,
         v_opt=v_opt,
         v_iters=config['value']['iterations_per_epoch'],
-        epochs=20, #300, #200 FIXME
-        rollout_episodes=60,
+        epochs=config['train_epochs'],
+        rollout_episodes=60, 
         rollout_steps=60, 
         gamma=0.99,
         gae_lambda=0.9,
@@ -134,59 +157,49 @@ def training_function(config):
     # save model
     torch.save(policy.state_dict(), 'policy_final.pt')
 
-analysis = tune.run(
-    training_function,
-    config={
-        'trainenv': {
-            'stop_on_collision': False, #tune.grid_search([False, True]),
-            'safe_actions_collision_method': 'circle', 
-            'abort_unsafe_collision_method': 'circle', 
-        },
-        'policy': {
-            'learning_rate': 3e-4, # tune.grid_search([3e-4]),
-            'learning_rate_decay': 1.0, #tune.grid_search([1.0]),
-            'clip_ratio': 0.2, #tune.grid_search([0.2]),
-            'iterations_per_epoch': 100, #tune.grid_search([100]),
-            'hidden_layer_size': 10, #tune.grid_search([10, 20, 40]), FIXME
-            'n_hidden_layers': 2, #tune.grid_search([2, 3, 4]), FIXME
-            'activation':torch.nn.Tanh,
-            'option': tune.grid_search(list(range(len(option_list))))
-        },
-        'value': {
-            'learning_rate': 1e-3, # tune.grid_search([1e-3]),
-            'iterations_per_epoch': 1000, #tune.grid_search([1000]),
-        },
-        'discriminator': {
-            'learning_rate': 1e-3, #tune.grid_search([1e-3]),
-            'weight_decay': 1e-4, #tune.grid_search([1e-4]),
-            'iterations_per_epoch': 100, #tune.grid_search([100]),
-            'n_hidden_layers_element': 3,
-            'n_hidden_layers_global': 2,
-            'hidden_layer_size': 10,
-            'activation': torch.nn.Tanh,
-        },
-        'seed': 0,
-    }
-)
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('experiment', choices=['A', 'B'])
+    parser.add_argument('--epochs', type=int, default=200)
+    args = parser.parse_args()
+    
 
-print('Best config: ', analysis.get_best_config(metric='gen_collision_rate', mode='min'))
-
-# %%
-# policy = SetMaskedDiscretePolicy(env_fn(0).action_space.n)
-# policy(torch.zeros(env_fn(0).observation_space['observation'].shape), torch.zeros(env_fn(0).observation_space['safe_actions'].shape))
-# policy.load_state_dict(torch.load('sgail-ppo-options-setobs2.pt'))
-
-# env = env_fn(0)
-# obs = env.reset()
-# env.render(mode='post')
-# for i in range(300):
-#     action = policy.sample(policy(
-#         torch.tensor(obs['observation'], dtype=torch.float32),
-#         torch.tensor(obs['safe_actions'], dtype=torch.float32),
-#     ))
-#     obs, reward, done, _ = env.step(action, render_mode='post')
-#     print('step', i, 'reward', reward, 'safe actions', obs['safe_actions'])
-#     if done:
-#         break
-# env.close()
-# %%
+    print('Running Tuning for Experiment %s'%(args.experiment))
+    analysis = tune.run(
+        training_function,
+        config={
+            'experiment': args.experiment,
+            'trainenv': {
+                'stop_on_collision': False, 
+                'safe_actions_collision_method': 'circle', 
+                'abort_unsafe_collision_method': 'circle',
+            },
+            'policy': {
+                'learning_rate': 3e-4, 
+                'learning_rate_decay': 1.0, 
+                'clip_ratio': 0.2, 
+                'iterations_per_epoch': 100,
+                'hidden_layer_size': tune.grid_search([20, 40]),
+                'n_hidden_layers': tune.grid_search([2, 3]), 
+                'activation':0,
+                'option': tune.grid_search(list(range(len(option_list))))
+            },
+            'value': {
+                'learning_rate': 1e-3, 
+                'iterations_per_epoch': 1000, 
+            },
+            'discriminator': {
+                'learning_rate': 1e-3, 
+                'weight_decay': 1e-4, 
+                'iterations_per_epoch': 100, 
+                'n_hidden_layers_element': tune.grid_search([3,4]),
+                'n_hidden_layers_global': tune.grid_search([1,2]),
+                'hidden_layer_size': 10, 
+                'activation': 0,
+            },
+            'train_epochs': args.epochs,
+            'seed': 0,
+        }
+    )
+    print('Best config: ', analysis.get_best_config(metric='gen_collision_rate', mode='min'))
