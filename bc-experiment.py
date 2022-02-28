@@ -117,7 +117,7 @@ def training_function(config):
         pi_opt.step()
         pi_lr_scheduler.step()
 
-        if epoch % 10 == 0:
+        if epoch % 25 == 0:
             gen_states, gen_actions, gen_rewards, gen_dones, gen_collisions = rollout(env_fn, policy.cpu(), n_episodes=60, max_steps_per_episode=200)
             gen_mean_episode_length = (~gen_dones).sum() / gen_states.shape[0]
             gen_mean_reward_per_episode = gen_rewards[~gen_dones].sum() / gen_states.shape[0]

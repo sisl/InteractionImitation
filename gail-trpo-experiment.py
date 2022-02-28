@@ -184,8 +184,8 @@ if __name__ == '__main__':
                 },
                 'discriminator': {
                     'learning_rate': 1e-3, 
-                    'weight_decay': 1e-4, # 1e-5 Fixme
-                    'iterations_per_epoch': 100, # 500 Fixme
+                    'weight_decay': 1e-4, 
+                    'iterations_per_epoch': 100, 
                     'n_hidden_layers_element': tune.grid_search([3,4]),
                     'n_hidden_layers_global': tune.grid_search([1,2]),
                     'hidden_layer_size': 10, 

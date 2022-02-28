@@ -10,6 +10,6 @@
         "n_hidden_layers": 2,
         "activation": 0
     },
-    "train_epochs": 1000,
+    "train_epochs": 300,
     "seed": 0
 }
