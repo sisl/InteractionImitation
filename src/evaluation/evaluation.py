@@ -6,8 +6,9 @@ from typing import Callable, Dict, Optional
 import os
 import pickle
 from tqdm import tqdm
+from src.util.wrappers import IntersimpleTimeLimit
 from src.options.envs import OptionsEnv
-from src.util.wrappers import OptionsTimeLimit
+from src.safe_options.options import SafeOptionsEnv
 
 class IntersimpleEvaluation:
     """
@@ -36,7 +37,10 @@ class IntersimpleEvaluation:
         self.env = eval_env
         self.n_episodes = eval_env.nv
         self.use_pbar = use_pbar
-        self.is_options_env = isinstance(self.env, (OptionsEnv, OptionsTimeLimit))
+        if isinstance(self.env, IntersimpleTimeLimit):
+            self.is_options_env = isinstance(self.env.env, (OptionsEnv, SafeOptionsEnv))
+        else:
+            self.is_options_env = isinstance(self.env, (OptionsEnv, SafeOptionsEnv))
 
         # metrics present on every step of every episode
         self.metric_keys_all = ['x_all', 'y_all', 'v_all', 'a_all', 'col_all']
@@ -135,8 +139,8 @@ class IntersimpleEvaluation:
         self._metrics['a_all'][_agent].append(info['action_taken'][_agent,0].item())
         col = info['collision']
 
-        if col:
-            assert done
+        # if col: # commenting out if we dont want to end on collision
+        #     assert done
         self._metrics['col_all'][_agent].append(col)
         
         if done and self.use_pbar:

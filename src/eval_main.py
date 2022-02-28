@@ -14,7 +14,8 @@ from src.core.reparam_module import ReparamPolicy, ReparamSafePolicy
 from src.options import envs as options_envs2
 from src.safe_options.policy import SetMaskedDiscretePolicy
 from src.safe_options import options as options_envs3
-
+from src.util.wrappers import IntersimpleTimeLimit
+import os
 from typing import Optional, List, Dict, Tuple
 import torch
 import numpy as np
@@ -36,46 +37,47 @@ def load_policy(method:str,
     Returns:
         policy (Optional[BaseAlgorithm]): the policy to evaluate
     """
+    ml = torch.device('cpu') if not torch.cuda.is_available() else None
     if method == 'idm':
         policy = IDMRulePolicy(env, **policy_kwargs)
     elif method == 'bc':
         policy = SetPolicy(env.action_space.shape[-1])
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
+        policy.eval()
+    elif method == 'gail-trpo':
+        policy = SetPolicy(env.action_space.shape[-1])
+        policy(torch.zeros(env.observation_space.shape))
+        policy = ReparamPolicy(policy)
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'gail':
         policy = SetPolicy(env.action_space.shape[-1])
-        policy(torch.zeros(env.observation_space.shape))
-        policy = ReparamPolicy(policy)
-        policy.load_state_dict(torch.load(policy_file))
-        policy.eval()
-    elif method == 'gail-ppo':
-        policy = SetPolicy(env.action_space.shape[-1])
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'rail':
         raise NotImplementedError
-    elif method == 'ogail':
+    elif method == 'hail-trpo':
         policy = SetDiscretePolicy(env.action_space.n)
         policy(torch.zeros(env.observation_space.shape))
         policy = ReparamPolicy(policy)
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
-    elif method == 'ogail-ppo':
+    elif method == 'hail':
         policy = SetDiscretePolicy(env.action_space.n)
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
-    elif method == 'sgail':
+    elif method == 'shail-trpo':
         policy = SetMaskedDiscretePolicy(env.action_space.n)
         policy(
             torch.zeros(env.observation_space['observation'].shape),
             torch.zeros(env.observation_space['safe_actions'].shape)
         )
         policy = ReparamSafePolicy(policy)
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
-    elif method == 'sgail-ppo':
+    elif method == 'shail':
         policy = SetMaskedDiscretePolicy(env.action_space.n)
-        policy.load_state_dict(torch.load(policy_file))
+        policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     else:
         raise NotImplementedError
@@ -201,7 +203,7 @@ def evaluate_policy(locations:List[Tuple[int,int]],
 
     # iterate through vehicles
     for i, location in tqdm(enumerate(locations)):
-        
+
         # add roundabout and track to environent 
         iround, track = location
         rname = intersim.LOCATIONS[iround]
@@ -214,7 +216,14 @@ def evaluate_policy(locations:List[Tuple[int,int]],
 
         # initialize environment
         Env = envs_dict[env_class]
-        eval_env = Env(**env_kwargs)
+
+        # wrap in TimeLimit
+        if 'max_episode_steps' in it_env_kwargs.keys():
+            steps = it_env_kwargs.pop('max_episode_steps')
+            eval_env = IntersimpleTimeLimit(Env(**it_env_kwargs), 
+                max_episode_steps=steps)
+        else:
+            eval_env = Env(**it_env_kwargs)
         evaluator = IntersimpleEvaluation(eval_env)
 
         # load policy
@@ -238,6 +247,14 @@ def summary_metrics(metrics:List[Dict[str,list]]) -> Dict[str,float]:
     """
     # keys = ['col_all','v_all', 'a_all','j_all', 'v_avg', 'a_avg', 'col', 'brake', 't']
     summary_metrics = {}
+    
+    # mean travel distance
+    dt = 0.1
+    travel_ds = []
+    for iRound in range(len(metrics)):
+        for iTraj in range(len(metrics[iRound]['v_all'])):
+            travel_ds.append(dt*sum(metrics[iRound]['v_all'][iTraj]))
+    summary_metrics['mean travel distance'] = sum(travel_ds)/len(travel_ds)
 
     # average average-velocity
     all_vavgs =  sum([d['v_avg'] for d in metrics],[]) # aggregate to single list
@@ -265,6 +282,7 @@ def summary_metrics(metrics:List[Dict[str,list]]) -> Dict[str,float]:
     # collision rate
     all_collisions = sum([d['col'] for d in metrics],[]) # aggregate to single list
     summary_metrics['collision rate'] = sum(all_collisions)/len(all_collisions)
+    summary_metrics['success rate'] = 1 - summary_metrics['collision rate']
 
     # hard brake rate
     all_hard_brakes = sum([d['brake'] for d in metrics],[]) # aggregate to single list
@@ -273,6 +291,8 @@ def summary_metrics(metrics:List[Dict[str,list]]) -> Dict[str,float]:
     # average number of timesteps
     all_ts = sum([d['t'] for d in metrics],[]) # aggregate to single list
     summary_metrics['mean episode length'] = sum(all_ts)/len(all_ts)
+    summary_metrics['mean episode time'] = summary_metrics['mean episode length'] * dt
+
 
     for key in summary_metrics.keys():
         print(f'{key}: {summary_metrics[key]}')
@@ -303,7 +323,7 @@ def comparison_metrics(policy_metrics:List[Dict[str,list]],
             expert_traj.append(np.vstack((expert_metrics[iR]['x_all'][iTraj], expert_metrics[iR]['y_all'][iTraj]))) 
             policy_traj.append(np.vstack((policy_metrics[iR]['x_all'][iTraj], policy_metrics[iR]['y_all'][iTraj]))) 
     assert len(expert_traj)==len(policy_traj)
-    comparison_metrics['rwse'] = rwse(expert_traj, policy_traj)
+    comparison_metrics.update(rwse(expert_traj, policy_traj))
 
     # average velocity shortfall
     expert_vavg = np.array(sum([d['v_avg'] for d in expert_metrics],[]))
@@ -355,14 +375,28 @@ def eval_main(
         policy_file (str): path to saved policy
         env (str): environment class
         method (str): method (expert, bc, gail, rail, hgail, hrail)
+
+    Returns:
+        outbase (str): string to outbase 
     """
-    print(f'Evaluating {method} on {env}')
+    print(f'#############################################################################')
+    print(f'Evaluating {method} from file {policy_file} on {env} at locations {locations}')
+    print(f'#############################################################################')
 
     # set seed
     np.random.seed(seed)
     torch.manual_seed(seed)
-    pfilename = policy_file.split('/')[-1].split('.')[0]
-    outbase = f'out/{method}/{pfilename}_seed{seed}'
+    locstr = 'loc_'+'_'.join([f'r{ro}t{tr}' for (ro,tr) in locations])
+    if policy_file == '':
+        method_path = method
+        name_base = method
+    else:
+        path_items =  policy_file.split('/')
+        name_base = path_items[-1].split('.')[0]
+        method_path = ('/').join(path_items[1:-1])
+    outfolder = os.path.join('out',method_path,locstr)
+    filebase = name_base + f'_tseed{seed}'
+    outbase = os.path.join(outfolder,filebase)
 
     # load expert metrics
     expert_metrics = generate_expert_metrics(locations)
@@ -381,6 +415,8 @@ def eval_main(
         save_metrics(smetrics, outbase+'_summary.pkl')
         cmetrics = comparison_metrics(policy_metrics, expert_metrics, outbase=outbase)
         save_metrics(cmetrics, outbase+'_comparison.pkl')
+    
+    return outbase
 
 if __name__=='__main__':
     import fire

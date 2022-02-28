@@ -36,30 +36,31 @@ class BasePolicy(nn.Module):
 
 class Policy(BasePolicy):
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, hidden_layer_size=50, n_hidden_layers=2, activation=nn.Tanh, **kwargs):
         super().__init__(*args, **kwargs)
-        self.nn = nn.Sequential(
-            nn.LazyLinear(50),
-            nn.Tanh(),
-            nn.LazyLinear(50),
-            nn.Tanh(),
-            nn.LazyLinear(2 * self.action_dim),
-        )
+        layers = sum([[nn.LazyLinear(hidden_layer_size), 
+            activation()] for _ in range(n_hidden_layers)],[])
+        self.nn = nn.Sequential(*layers, nn.LazyLinear(2 *self.action_dim))
+        
+        # old
+        # self.nn = nn.Sequential(
+        #    nn.LazyLinear(50),
+        #    nn.Tanh(),
+        #    nn.LazyLinear(50),
+        #    nn.Tanh(),
+        #    nn.LazyLinear(2 * self.action_dim),
+        #)
 
     def forward(self, states):
         return self.nn(states)
 
 class DiscretePolicy(BasePolicy):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, hidden_layer_size=50, n_hidden_layers=2, activation=nn.Tanh, **kwargs):
         super().__init__(*args, **kwargs)
-        self.nn = nn.Sequential(
-            nn.LazyLinear(50),
-            nn.Tanh(),
-            nn.LazyLinear(50),
-            nn.Tanh(),
-            nn.LazyLinear(self.action_dim),
-        )
+        layers = sum([[nn.LazyLinear(hidden_layer_size), 
+            activation()] for _ in range(n_hidden_layers)],[])
+        self.nn = nn.Sequential(*layers, nn.LazyLinear(self.action_dim))
 
     def forward(self, states):
         return self.nn(states)

@@ -18,23 +18,17 @@ class Discriminator(nn.Module):
 
 class DeepsetDiscriminator(nn.Module):
 
-    def __init__(self):
+    def __init__(self, n_hidden_layers_element=3, n_hidden_layers_global=2, hidden_layer_size=10, activation=nn.Tanh):
         super().__init__()
-        self.elem = nn.Sequential(
-            nn.LazyLinear(10),
-            nn.Tanh(),
-            nn.LazyLinear(10),
-            nn.Tanh(),
-            nn.LazyLinear(10),
-        )
-        self.glob = nn.Sequential(
-            nn.LazyLinear(10),
-            nn.Tanh(),
-            nn.LazyLinear(10),
-            nn.Tanh(),
-            nn.LazyLinear(1),
-        )
-    
+
+        layers_elem = sum([[nn.LazyLinear(hidden_layer_size), 
+            activation()] for _ in range(n_hidden_layers_element)], [])
+        self.elem = nn.Sequential(*layers_elem)
+
+        layers_glob = sum([[nn.LazyLinear(hidden_layer_size), 
+            activation()] for _ in range(n_hidden_layers_global)], [])
+        self.glob = nn.Sequential(*layers_glob, nn.LazyLinear(1))
+        
     def forward(self, states, actions):
         actions = actions.unsqueeze(-2)
         actions = actions.expand(*actions.shape[:-2], states.shape[-2], actions.shape[-1])

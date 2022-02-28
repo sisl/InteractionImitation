@@ -1,42 +1,19 @@
-# eval_main inputs
-# locations: List[Tuple[int,int]]= [(0,0)],
-# method: str='expert', 
-# policy_file: str='', 
-# policy_kwargs: dict={},
-# env: str='NRasterizedRouteIncrementingAgent', 
-# env_kwargs: dict={},
-# seed: int=0
+# can add --skip_running if you've run the runs before on the saved policies
 
-# expert
-python -m src.eval_main
+python -m eval_experiments 
+python -m eval_experiments --locations='[(0,4)]' 
+python -m eval_experiments --method idm 
+python -m eval_experiments --method idm --locations='[(0,4)]' 
+python -m eval_experiments --method bc --folder='test_policies/bc/expA' 
+python -m eval_experiments --method bc --folder='test_policies/bc/expB' --locations='[(0,4)]' 
+python -m eval_experiments --method gail --folder='test_policies/gail/expA' 
+python -m eval_experiments --method gail --folder='test_policies/gail/expB' --locations='[(0,4)]' 
+python -m eval_experiments --method hail --folder='test_policies/hail/expA' --env_kwargs='{safe_actions_collision_method=None,abort_unsafe_collision_method=None}'
+python -m eval_experiments --method hail --folder='test_policies/hail/expB' --locations='[(0,4)]' --env_kwargs='{safe_actions_collision_method=None,abort_unsafe_collision_method=None}'
+python -m eval_experiments --method shail --folder='test_policies/shail/expA'
+python -m eval_experiments --method shail --folder='test_policies/shail/expB' --locations='[(0,4)]'
 
-# idm
-python -m src.eval_main --method=idm
-
-# behavior cloning
-python -m src.eval_main --method=bc --policy_file='checkpoints/bc-intersimple-setobs2.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=0
-python -m src.eval_main --method=bc --policy_file='checkpoints/bc-intersimple-setobs2.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=1
-python -m src.eval_main --method=bc --policy_file='checkpoints/bc-intersimple-setobs2.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=2
-python -m src.eval_main --method=bc --policy_file='checkpoints/bc-intersimple-setobs2.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=3
-python -m src.eval_main --method=bc --policy_file='checkpoints/bc-intersimple-setobs2.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=4
-python -m src.evaluation.utils load_and_average out/bc
-
-# GAIL
-python -m src.eval_main --method=gail --policy_file='checkpoints/gail-intersimple-setobs2-03-02-22.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=0
-python -m src.eval_main --method=gail --policy_file='checkpoints/gail-intersimple-setobs2-03-02-22.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=1
-python -m src.eval_main --method=gail --policy_file='checkpoints/gail-intersimple-setobs2-03-02-22.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=2
-python -m src.eval_main --method=gail --policy_file='checkpoints/gail-intersimple-setobs2-03-02-22.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=3
-python -m src.eval_main --method=gail --policy_file='checkpoints/gail-intersimple-setobs2-03-02-22.pt' --env='NormalizedContinuousEvalEnv' --env_kwargs='{stop_on_collision:True}' --seed=4
-python -m src.evaluation.utils load_and_average out/gail
-
-# options GAIL
-python -m src.eval_main --method=ogail --policy_file='checkpoints/gail-options-setobs2-Feb15_18-49-05.pt' --env='NormalizedOptionsEvalEnv' --env_kwargs='{stop_on_collision:True}'
-
-# options GAIL-PPO
-python -m src.eval_main --method=ogail-ppo --policy_file='checkpoints/gail-ppo-options-setobs2-Feb15_22-05-38.pt' --env='NormalizedOptionsEvalEnv' --env_kwargs='{stop_on_collision:True}'
-
-# SHAIL
-python -m src.eval_main --method=sgail --policy_file='checkpoints/sgail-options-setobs2.pt' --env='NormalizedSafeOptionsEvalEnv' --env_kwargs='{stop_on_collision:True,max_episode_steps:1000}'
-
-# SHAIL-PPO
-python -m src.eval_main --method=sgail-ppo --policy_file='checkpoints/sgail-ppo-options-setobs2-17-02-2022.pt' --env='NormalizedSafeOptionsEvalEnv' --env_kwargs='{stop_on_collision:True,max_episode_steps:1000}'
+python -m eval_experiments --method hail --folder='test_policies/hail-etienne/expA'
+python -m eval_experiments --method hail --folder='test_policies/hail-etienne/expB' --locations='[(0,4)]'
+python -m eval_experiments --method shail --folder='test_policies/shail-etienne/expA'
+python -m eval_experiments --method shail --folder='test_policies/shail-etienne/expB' --locations='[(0,4)]'
