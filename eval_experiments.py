@@ -12,7 +12,7 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
         env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000}
     elif method in ['hail']:
         env = 'NormalizedOptionsEvalEnv'
-        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000}
+        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000, 'safe_actions_collision_method': None, 'abort_unsafe_collision_method': None}
     elif method in ['shail']:
         env = 'NormalizedSafeOptionsEvalEnv'
         env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000}
