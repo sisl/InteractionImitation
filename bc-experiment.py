@@ -162,9 +162,9 @@ if __name__ == '__main__':
                 },
                 'policy': {
                     'learning_rate': 3e-4, 
-                    'learning_rate_decay': 1.0, 
-                    'hidden_layer_size': tune.grid_search([20, 40]),
-                    'n_hidden_layers': tune.grid_search([2, 3]), 
+                    'learning_rate_decay': tune.grid_search([0.001, 1.0]), 
+                    'hidden_layer_size': tune.grid_search([10, 20, 40, 80]),
+                    'n_hidden_layers': tune.grid_search([2, 3, 4]), 
                     'activation':0,
                 },
                 'train_epochs': args.epochs,
