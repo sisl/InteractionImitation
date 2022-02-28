@@ -14,9 +14,9 @@ class PControllerPolicy(BaseAlgorithm):
         self._env = env
         self.target_v = 8.94 # m/s
         self.attn_weight = 20
-    
+
     # BaseAlgorithm abstract methods
-    def _setup_model(self): 
+    def _setup_model(self):
         return None
     def learn(self, *args, **kwargs):
         return self
@@ -26,7 +26,7 @@ class PControllerPolicy(BaseAlgorithm):
         Generate action, state from observation
 
         (But actually generate next action from underlying environment state)
-        
+
         Args:
             observation (np.ndarray): instantaneous observation from environment
 
@@ -36,16 +36,16 @@ class PControllerPolicy(BaseAlgorithm):
         """
         agent = self._env._agent
         ego_state = self._env._env.projected_state[agent].numpy() # (5,) tensor
-        
-        
+
+
         # relative_state = np.delete(self._env._env.relative_state[agent].numpy(), agent, axis=0) #(nv-1, 6) tensor
-        
+
         # calculate front and left distances from ego
 
         # calculate relative speed in direction of position difference vector
-        
+
         # calculate angle alpha and distance d of vehicle i from ego heading
-        
+
         # attn[i] ~= exp( -(alpha[i])^2 - .01 * d[i] - .1 * vrel[i]
 
 
@@ -60,14 +60,14 @@ class IDMRulePolicy(BaseAlgorithm):
 
     The front car is chosen as the closer of:
         - closest car within a 45 degree half angle cone of the ego's heading
-        - ''' after propagating the environment forward by `t_future' seconds with 
+        - ''' after propagating the environment forward by `t_future' seconds with
             current headings and velocities
-    
+
     """
 
-    def __init__(self, env: Intersimple, 
-        target_speed:float= 8.94, 
-        t_future:List[float]=[0., 1., 2., 3.], 
+    def __init__(self, env: Intersimple,
+        target_speed:float= 8.94,
+        t_future:List[float]=[0., 1., 2., 3.],
         half_angle:float=60.):
         """
         Initialize policy with pointer to environment it will run on and target speed
@@ -82,6 +82,7 @@ class IDMRulePolicy(BaseAlgorithm):
         self._env = env
         self.t_future = t_future
         self.half_angle = half_angle
+        self.max_heading_diff = 120
 
         # Default IDM parameters
         assert target_speed>0, 'negative target speed'
@@ -95,18 +96,18 @@ class IDMRulePolicy(BaseAlgorithm):
         np.seterr(invalid='ignore')
 
     # BaseAlgorithm abstract methods
-    def _setup_model(self): 
+    def _setup_model(self):
         return None
     def learn(self, *args, **kwargs):
         return self
-    
-    def predict(self, observation:np.ndarray, 
+
+    def predict(self, observation:np.ndarray,
         *args, **kwargs) -> Tuple[np.ndarray, None]:
         """
         Predict action, state from observation
 
         (But actually generate next action from underlying environment state)
-        
+
         Args:
             observation (np.ndarray): instantaneous observation from environment
 
@@ -138,11 +139,11 @@ class IDMRulePolicy(BaseAlgorithm):
             if t > 0:
                 xy2 = xy + t * v * np.vstack((np.cos(psi[:,0]), np.sin(psi[:,0]))).T
                 d2, r2, i2 = self.get_ego_dr(agent, xy2, v, psi)
-                
+
                 # choose closer vehicle (now vs imagined)
                 if d2 < d:
                     d, r, i = d2, r2, i2
-        
+
         # Update environment interaction graph with i
         if i:
             self._env._env._graph._neighbor_dict={agent:[i]}
@@ -155,19 +156,19 @@ class IDMRulePolicy(BaseAlgorithm):
 
         assert (d_des>= self.d_min)
         action = self.a_max*(1 - (s/self.s_max)**4 - (d_des/d)**2)
-        
+
         # normalize action to range if env is a NormalizedActionSpace
         if isinstance(self._env, NormalizedActionSpace):
             action = self._env._normalize(action)
 
         assert action.shape==(1,)
         return action
-    
-    def get_ego_dr(self, agent:int, xy: np.ndarray, 
+
+    def get_ego_dr(self, agent:int, xy: np.ndarray,
         v: np.ndarray, psi: np.ndarray) -> Tuple[float, float, Optional[int]]:
         """
         Return distance and relative speed of closest car within half angle from heading
-        
+
         Args:
             agent (int): agent index
             xy (np.ndarray): (nv, 2) x and y positions
@@ -177,7 +178,7 @@ class IDMRulePolicy(BaseAlgorithm):
         Returns:
             d (float): distance to closest vehicle in cone
             r (float): relative speed between the two vehicles
-            i (Optional[int]): index of closest vehicle, or None 
+            i (Optional[int]): index of closest vehicle, or None
         """
         nv, nxy = xy.shape
         nv2, nvel = v.shape
@@ -192,8 +193,12 @@ class IDMRulePolicy(BaseAlgorithm):
         dl = (dxys*np.hstack((-np.sin(psi), np.cos(psi)))).sum(-1) # (nv, )
         alpha = to_circle(np.arctan2(dl, df))
 
-        val_idx = np.arange(nv)[(np.abs(alpha) < self.half_angle*np.pi/180) & (np.arange(nv) != agent)]
-        
+        heading_diff = to_circle(psi - psi[agent]).flatten()
+
+        val_idx = np.arange(nv)[
+            (np.abs(alpha) < self.half_angle*np.pi/180) & (np.arange(nv) != agent) & (np.abs(heading_diff) < self.max_heading_diff*np.pi/180)
+            ]
+
         if len(val_idx)==0:
             i = None
             d = float('inf')
@@ -202,10 +207,10 @@ class IDMRulePolicy(BaseAlgorithm):
             idx = np.argmin(ds[val_idx]) # closest car which meets requirements
             i = int(val_idx[idx])
             d = ds[i]
-            r = v[i,0]-v[agent,0] 
-            
+            r = v[i,0]-v[agent,0]
+
         return d, r, i
-    
+
 def to_circle(x: np.ndarray) -> np.ndarray:
     """
     Casts x (in rad) to [-pi, pi)
