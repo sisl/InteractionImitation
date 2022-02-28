@@ -41,33 +41,33 @@ def load_policy(method:str,
     if method == 'idm':
         policy = IDMRulePolicy(env, **policy_kwargs)
     elif method == 'bc':
-        policy = SetPolicy(env.action_space.shape[-1])
+        policy = SetPolicy(env.action_space.shape[-1], **policy_kwargs)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'gail-trpo':
-        policy = SetPolicy(env.action_space.shape[-1])
+        policy = SetPolicy(env.action_space.shape[-1], **policy_kwargs)
         policy(torch.zeros(env.observation_space.shape))
         policy = ReparamPolicy(policy)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'gail':
-        policy = SetPolicy(env.action_space.shape[-1])
+        policy = SetPolicy(env.action_space.shape[-1], **policy_kwargs)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'rail':
         raise NotImplementedError
     elif method == 'hail-trpo':
-        policy = SetDiscretePolicy(env.action_space.n)
+        policy = SetMaskedDiscretePolicy(env.action_space.n, **policy_kwargs)
         policy(torch.zeros(env.observation_space.shape))
         policy = ReparamPolicy(policy)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'hail':
-        policy = SetDiscretePolicy(env.action_space.n)
+        policy = SetMaskedDiscretePolicy(env.action_space.n, **policy_kwargs)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'shail-trpo':
-        policy = SetMaskedDiscretePolicy(env.action_space.n)
+        policy = SetMaskedDiscretePolicy(env.action_space.n, **policy_kwargs)
         policy(
             torch.zeros(env.observation_space['observation'].shape),
             torch.zeros(env.observation_space['safe_actions'].shape)
@@ -76,7 +76,7 @@ def load_policy(method:str,
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'shail':
-        policy = SetMaskedDiscretePolicy(env.action_space.n)
+        policy = SetMaskedDiscretePolicy(env.action_space.n, **policy_kwargs)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     else:

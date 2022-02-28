@@ -247,6 +247,13 @@ if __name__ == '__main__':
             os.makedirs(savepath)
         
         import shutil
+
+        # save config
+        shutil.copyfile(
+            args.test,
+            os.path.join(savepath, 'config.json')
+        )
+
         for i in range(args.test_seeds):
             s = analysis._checkpoints[i]['config']['seed']
             check_dir = analysis._checkpoints[i]['logdir']
