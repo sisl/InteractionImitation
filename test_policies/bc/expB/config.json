@@ -1,0 +1,15 @@
+{
+    "experiment": "B",
+    "trainenv": {
+        "stop_on_collision": false
+    },
+    "policy": {
+        "learning_rate": 0.0003,
+        "learning_rate_decay": 1.0,
+        "hidden_layer_size": 40,
+        "n_hidden_layers": 2,
+        "activation": 0
+    },
+    "train_epochs": 300,
+    "seed": 0
+}
