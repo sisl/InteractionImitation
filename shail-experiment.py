@@ -185,11 +185,11 @@ if __name__ == '__main__':
                     'learning_rate': 3e-4, 
                     'learning_rate_decay': 1.0, 
                     'clip_ratio': 0.2, 
-                    'iterations_per_epoch': 100,
-                    'hidden_layer_size': tune.grid_search([20, 40]),
-                    'n_hidden_layers': tune.grid_search([2, 3]), 
+                    'iterations_per_epoch': tune.grid_search([250, 500, 750]),
+                    'hidden_layer_size': 40, #tune.grid_search([20, 40]),
+                    'n_hidden_layers': 3, #tune.grid_search([2, 3]), 
                     'activation':0,
-                    'option': tune.grid_search(list(range(len(option_list))))
+                    'option': 0, #tune.grid_search(list(range(len(option_list))))
                 },
                 'value': {
                     'learning_rate': 1e-3, 
@@ -199,8 +199,8 @@ if __name__ == '__main__':
                     'learning_rate': 1e-3, 
                     'weight_decay': 1e-4, 
                     'iterations_per_epoch': 100, 
-                    'n_hidden_layers_element': tune.grid_search([3,4]),
-                    'n_hidden_layers_global': tune.grid_search([1,2]),
+                    'n_hidden_layers_element': 3, #tune.grid_search([3,4]),
+                    'n_hidden_layers_global': 2, #tune.grid_search([1,2]),
                     'hidden_layer_size': 10, 
                     'activation': 0,
                 },
