@@ -15,7 +15,7 @@ from src.options import envs as options_envs2
 from src.safe_options.policy import SetMaskedDiscretePolicy
 from src.safe_options import options as options_envs3
 from src.util.wrappers import IntersimpleTimeLimit
-
+import os
 from typing import Optional, List, Dict, Tuple
 import torch
 import numpy as np
@@ -44,29 +44,29 @@ def load_policy(method:str,
         policy = SetPolicy(env.action_space.shape[-1])
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
-    elif method == 'gail':
+    elif method == 'gail-trpo':
         policy = SetPolicy(env.action_space.shape[-1])
         policy(torch.zeros(env.observation_space.shape))
         policy = ReparamPolicy(policy)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
-    elif method == 'gail-ppo':
+    elif method == 'gail':
         policy = SetPolicy(env.action_space.shape[-1])
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
     elif method == 'rail':
         raise NotImplementedError
-    elif method == 'ogail':
+    elif method == 'hail-trpo':
         policy = SetDiscretePolicy(env.action_space.n)
         policy(torch.zeros(env.observation_space.shape))
         policy = ReparamPolicy(policy)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
-    elif method == 'ogail-ppo':
+    elif method == 'hail':
         policy = SetDiscretePolicy(env.action_space.n)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
-    elif method == 'sgail':
+    elif method == 'shail-trpo':
         policy = SetMaskedDiscretePolicy(env.action_space.n)
         policy(
             torch.zeros(env.observation_space['observation'].shape),
@@ -75,7 +75,7 @@ def load_policy(method:str,
         policy = ReparamSafePolicy(policy)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
-    elif method == 'sgail-ppo':
+    elif method == 'shail':
         policy = SetMaskedDiscretePolicy(env.action_space.n)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
         policy.eval()
@@ -375,6 +375,9 @@ def eval_main(
         policy_file (str): path to saved policy
         env (str): environment class
         method (str): method (expert, bc, gail, rail, hgail, hrail)
+
+    Returns:
+        outbase (str): string to outbase 
     """
     print(f'#############################################################################')
     print(f'Evaluating {method} from file {policy_file} on {env} at locations {locations}')
@@ -383,9 +386,17 @@ def eval_main(
     # set seed
     np.random.seed(seed)
     torch.manual_seed(seed)
-    pfilename = policy_file.split('/')[-1].split('.')[0]
     locstr = 'loc_'+'_'.join([f'r{ro}t{tr}' for (ro,tr) in locations])
-    outbase = f'out/{method}/{locstr}/{pfilename}_seed{seed}'
+    if policy_file == '':
+        method_path = method
+        name_base = method
+    else:
+        path_items =  policy_file.split('/')
+        name_base = path_items[-1].split('.')[0]
+        method_path = ('/').join(path_items[1:-1])
+    outfolder = os.path.join('out',method_path,locstr)
+    filebase = name_base + f'_tseed{seed}'
+    outbase = os.path.join(outfolder,filebase)
 
     # load expert metrics
     expert_metrics = generate_expert_metrics(locations)
@@ -404,6 +415,8 @@ def eval_main(
         save_metrics(smetrics, outbase+'_summary.pkl')
         cmetrics = comparison_metrics(policy_metrics, expert_metrics, outbase=outbase)
         save_metrics(cmetrics, outbase+'_comparison.pkl')
+    
+    return outbase
 
 if __name__=='__main__':
     import fire
