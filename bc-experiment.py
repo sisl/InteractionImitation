@@ -44,18 +44,36 @@ def training_function(config):
     np.random.seed(config['seed'])
     torch.manual_seed(config['seed'])
 
-    envs = [Setobs(TransformObservation(CollisionPenaltyWrapper(
-        IntersimpleLidarFlatRandom(
-            n_rays=5,
-            reward=functools.partial(
-                speed_reward,
-                collision_penalty=0
-            ),
-            check_collisions=True,
-            stop_on_collision=config['trainenv']['stop_on_collision'],
-        ), collision_distance=6, collision_penalty=100),
-        lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10)
-    )) for _ in range(60)]
+    # choose validation environment
+    if config['experiment'] == 'A': 
+        envs = [Setobs(TransformObservation(CollisionPenaltyWrapper(
+            IntersimpleLidarFlatRandom(
+                n_rays=5,
+                reward=functools.partial(
+                    speed_reward,
+                    collision_penalty=0
+                ),
+                check_collisions=True,
+                stop_on_collision=config['trainenv']['stop_on_collision'],
+            ), collision_distance=6, collision_penalty=100),
+            lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10)
+        )) for _ in range(60)]
+    elif config['experiment'] == 'B': 
+        envs = sum([[Setobs(TransformObservation(CollisionPenaltyWrapper(
+            IntersimpleLidarFlatRandom(
+                n_rays=5,
+                reward=functools.partial(
+                    speed_reward,
+                    collision_penalty=0
+                ),
+                check_collisions=True,
+                stop_on_collision=config['trainenv']['stop_on_collision'],
+            ), collision_distance=6, collision_penalty=100),
+            lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10)
+        )) for _ in range(15)] for track in range(4)],[])
+    else:
+        raise NotImplementedError
+
     env_fn = lambda i: envs[i]
 
     # load expert data
@@ -99,7 +117,7 @@ def training_function(config):
         pi_opt.step()
         pi_lr_scheduler.step()
 
-        if epoch % 100 == 0:
+        if epoch % 10 == 0:
             gen_states, gen_actions, gen_rewards, gen_dones, gen_collisions = rollout(env_fn, policy.cpu(), n_episodes=60, max_steps_per_episode=200)
             gen_mean_episode_length = (~gen_dones).sum() / gen_states.shape[0]
             gen_mean_reward_per_episode = gen_rewards[~gen_dones].sum() / gen_states.shape[0]
@@ -114,7 +132,7 @@ def training_function(config):
         
         # save model checkpoints
         ep = epoch + 1
-        if (ep % 25 == 0):
+        if (ep % 50 == 0):
             torch.save(policy.state_dict(), f'policy_epoch{ep}.pt')
 
     # save model
@@ -124,7 +142,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', choices=['A', 'B'])
-    parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--epochs', type=int, default=1000)
     parser.add_argument('--test', type=str, help='path to config file to run final training on')
     parser.add_argument('--test_seeds', type=int, default=5)
     parser.add_argument('--test_cpus', type=int, help='number of cpus available to split test seed training over')
