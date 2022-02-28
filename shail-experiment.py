@@ -62,7 +62,7 @@ def training_function(config):
             ), options=option_list[config['policy']['option']],
             safe_actions_collision_method=config['trainenv']['safe_actions_collision_method'], 
             abort_unsafe_collision_method=config['trainenv']['abort_unsafe_collision_method'],
-            ) for _ in range(60)]
+            ) for _ in range(120)]
 
     elif config['experiment'] == 'B': 
         envs = sum([[SafeOptionsEnv(Setobs(
@@ -142,7 +142,7 @@ def training_function(config):
         v_opt=v_opt,
         v_iters=config['value']['iterations_per_epoch'],
         epochs=config['train_epochs'],
-        rollout_episodes=60, 
+        rollout_episodes=120, 
         rollout_steps=60,
         gamma=0.99,
         gae_lambda=0.9,
