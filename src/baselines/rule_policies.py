@@ -87,9 +87,10 @@ class IDMRulePolicy(BaseAlgorithm):
         assert target_speed>0, 'negative target speed'
         self.v_max = target_speed
         self.a_max = np.array([3.]) # nominal acceleration
-        self.tau = 0.5 # desired time headway
+        self.tau = 1 # desired time headway
         self.b_pref = 2.5 # preferred deceleration
-        self.d_min = 1 #minimum spacing
+        self.d_min = 5 #minimum spacing
+        # self.delta_psi = 40 # [degree] max deviation in orientation to be mapped onto
 
         # for np.remainder nan warnings
         np.seterr(invalid='ignore')
@@ -142,22 +143,22 @@ class IDMRulePolicy(BaseAlgorithm):
         # time_horizon = np.array(range(3))
         # predictions = state[:,0:1] + np.outer(state[:,1], time_horizon)
 
-        paths = np.stack([x[:,:-1],y[:,:-1], heading], axis=1) # (nv x 3 x (path_length-1))
-        ego_path = paths[agent:agent+1] # (1 x 3 x path_length-1)
+        paths = np.stack([x[:,:-1],y[:,:-1], heading], axis=1) # (nv, 3, (path_length-1))
+        ego_path = paths[agent:agent+1] # (1, 3, path_length-1)
 
         # (x,y,phi) of all vehicles
-        poses = np.expand_dims(full_state[:, [0,1,3]], 2) # (nv x 3 x 1)
+        poses = np.expand_dims(full_state[:, [0,1,3]], 2) # (nv, 3, 1)
 
         diff = ego_path - poses
         diff[:, 2, :] = to_circle(diff[:, 2, :])
 
         # Test if position and heading angle are close for some point on the future vehicle track
-        max_pos_error = 1
-        pos_close = np.sum(diff[:, 0:2, :]**2, 1) <= max_pos_error**2 # (nv x path_length-1)
-        max_deg_error = 20
-        heading_close = np.abs(diff[:, 2, :]) <= 20 * np.pi / 180 # (nv x path_length-1)
+        max_pos_error = 2
+        pos_close = np.sum(diff[:, 0:2, :]**2, 1) <= max_pos_error**2 # (nv, path_length-1)
+        max_deg_error = 30
+        heading_close = np.abs(diff[:, 2, :]) <= max_deg_error * np.pi / 180 # (nv, path_length-1)
         # For all vehicles get the path points where they are close to the ego path
-        close = np.logical_and(pos_close, heading_close) # (nv x path_length-1)
+        close = np.logical_and(pos_close, heading_close) # (nv, path_length-1)
         close[agent, :] = False # exclude ego agent
 
         leader = agent
