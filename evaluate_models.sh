@@ -1,4 +1,4 @@
-# can add --skip_running if you've run before
+# can add --skip_running if you've run the runs before on the saved policies
 
 python -m eval_experiments 
 python -m eval_experiments --locations='[(0,4)]' 
@@ -12,3 +12,8 @@ python -m eval_experiments --method hail --folder='test_policies/hail/expA'
 python -m eval_experiments --method hail --folder='test_policies/hail/expB' --locations='[(0,4)]'
 python -m eval_experiments --method shail --folder='test_policies/shail/expA'
 python -m eval_experiments --method shail --folder='test_policies/shail/expB' --locations='[(0,4)]'
+
+python -m eval_experiments --method hail --folder='test_policies/hail-etienne/expA'
+python -m eval_experiments --method hail --folder='test_policies/hail-etienne/expB' --locations='[(0,4)]'
+python -m eval_experiments --method shail --folder='test_policies/shail-etienne/expA'
+python -m eval_experiments --method shail --folder='test_policies/shail-etienne/expB' --locations='[(0,4)]'
