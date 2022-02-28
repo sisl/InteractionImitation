@@ -37,7 +37,11 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
         outfolder = os.path.dirname(outbase)
     else:
         locstr = 'loc_'+'_'.join([f'r{ro}t{tr}' for (ro,tr) in locations])
-        outfolder = os.path.join('out',method,locstr)
+        if folder is None:
+            outfolder = os.path.join('out',method,locstr)
+        else:
+            path_items = folder.split('/')
+            outfolder = os.path.join('out', '/'.join(path_items[1:]), locstr)
     
     # load metrics from save_path
     average_metrics = load_and_average(outfolder)
@@ -55,8 +59,15 @@ def latex_print(am, light=False):
 
     print('success rate, distance travelled, RWSE_10, |DeltaV|, AccelJSD')
     if light:
-        print("%2.1f& %2.1f & --- & --- & "
-            "--- \\\\" %( 100*am['success rate'][0], am['mean travel distance'][0]))
+        if 'rwse_10s' in am.keys():
+            print("%2.1f& %2.1f & %1.2f & %2.1f& "
+            "%0.3f \\\\" %( 100*am['success rate'][0], am['mean travel distance'][0], am['rwse_10s'][0],
+                            am['average absolute average velocity'][0],am['acceleration distribution divergence'][0] ))
+            return
+
+
+        print("%2.1f& %2.1f & $---$ & $---$ & "
+            "$---$ \\\\" %( 100*am['success rate'][0], am['mean travel distance'][0]))
         return
     
     print("%2.1f \\scriptstyle\\pm %2.1f & %2.1f \\scriptstyle\\pm %2.1f & "
