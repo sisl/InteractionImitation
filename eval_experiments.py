@@ -9,13 +9,13 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
         env, env_kwargs ='NRasterizedRouteIncrementingAgent', {}
     elif method in ['bc','gail']:
         env='NormalizedContinuousEvalEnv' 
-        env_kwargs={stop_on_collision:True, max_episode_steps:1000}
+        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000}
     elif method in ['hail']:
         env = 'NormalizedOptionsEvalEnv'
-        env_kwargs={stop_on_collision:True, max_episode_steps:1000}
+        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000}
     elif method in ['shail']:
         env = 'NormalizedSafeOptionsEvalEnv'
-        env_kwargs={stop_on_collision:True, max_episode_steps:1000}
+        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000}
     else:
         raise NotImplementedError
 
@@ -39,8 +39,6 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
         locstr = 'loc_'+'_'.join([f'r{ro}t{tr}' for (ro,tr) in locations])
         outfolder = os.path.join('out',method,locstr)
     
-    import pdb
-    pdb.set_trace()
     # load metrics from save_path
     average_metrics = load_and_average(outfolder)
     if method in ['expert', 'idm']:
