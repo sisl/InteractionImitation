@@ -236,3 +236,5 @@ if __name__ == '__main__':
             check_dir = analysis._checkpoints[i]['logdir']
             shutil.copyfile(os.path.join(check_dir,'policy_final.pt'), 
                 os.path.join(savepath, f'policy_seed{s}.pt'))
+            shutil.copyfile(os.path.join(check_dir,'params.json'),
+                os.path.join(savepath, 'config.json')) # copy config automatically
