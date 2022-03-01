@@ -78,7 +78,7 @@ def training_function(config):
             ), options=option_list[config['policy']['option']],
             safe_actions_collision_method=config['trainenv']['safe_actions_collision_method'], 
             abort_unsafe_collision_method=config['trainenv']['abort_unsafe_collision_method'],
-            ) for _ in range(15)] for track in range(4)],[])
+            ) for _ in range(30)] for track in range(4)],[])
     
     else:
         raise NotImplementedError
