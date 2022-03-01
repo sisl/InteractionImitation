@@ -191,50 +191,6 @@ class IDMRulePolicy(BaseAlgorithm):
         assert action.shape==(1,)
         return action
 
-
-    def get_ego_dr(self, agent:int, xy: np.ndarray,
-        v: np.ndarray, psi: np.ndarray) -> Tuple[float, float, Optional[int]]:
-        """
-        Return distance and relative speed of closest car within half angle from heading
-
-        Args:
-            agent (int): agent index
-            xy (np.ndarray): (nv, 2) x and y positions
-            v (np.ndarray): (nv, 1) velocity
-            psi (np.ndarray): (nv, 1) heading angle
-
-        Returns:
-            d (float): distance to closest vehicle in cone
-            r (float): relative speed between the two vehicles
-            i (Optional[int]): index of closest vehicle, or None
-        """
-        nv, nxy = xy.shape
-        nv2, nvel = v.shape
-        nv3, npsi = psi.shape
-        assert nv==nv2==nv3
-        assert nxy==2
-        assert nvel==npsi==1
-
-        dxys = xy - xy[agent] # (nv, 2)
-        ds = np.linalg.norm(dxys,axis=1) # (nv,)
-        df = (dxys*np.hstack((np.cos(psi),np.sin(psi)))).sum(-1) # (nv, )
-        dl = (dxys*np.hstack((-np.sin(psi), np.cos(psi)))).sum(-1) # (nv, )
-        alpha = to_circle(np.arctan2(dl, df))
-
-        val_idx = np.arange(nv)[(np.abs(alpha) < self.half_angle*np.pi/180) & (np.arange(nv) != agent)]
-
-        if len(val_idx)==0:
-            i = None
-            d = float('inf')
-            r = float('inf')
-        else:
-            idx = np.argmin(ds[val_idx]) # closest car which meets requirements
-            i = int(val_idx[idx])
-            d = ds[i]
-            r = v[i,0]-v[agent,0]
-
-        return d, r, i
-
 def to_circle(x: np.ndarray) -> np.ndarray:
     """
     Casts x (in rad) to [-pi, pi)
