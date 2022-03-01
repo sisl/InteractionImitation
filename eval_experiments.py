@@ -35,12 +35,12 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
         print('%i policy files found in %s folder' %(len(files), folder))
         print('found policy config', config['policy'])
 
-    policy_config = {k: v for k, v in config['policy'].items() if k not in exclude_keys_from_policy_kwargs}
-    policy_config['activation'] = activations[policy_config['activation']]
-    print('final policy config', policy_config)
+        policy_config = {k: v for k, v in config['policy'].items() if k not in exclude_keys_from_policy_kwargs}
+        policy_config['activation'] = activations[policy_config['activation']]
+        print('final policy config', policy_config)
 
-    policy_kwargs.update(policy_config)
-    print('final policy kwargs', policy_kwargs)
+        policy_kwargs.update(policy_config)
+        print('final policy kwargs', policy_kwargs)
 
     if not skip_running:
         for policy_file in files:
@@ -77,7 +77,7 @@ def latex_print(am, light=False):
     print('success rate, distance travelled, RWSE_10, |DeltaV|, AccelJSD')
     if light:
         if 'rwse_10s' in am.keys():
-            print("%2.1f& %2.1f & %1.2f & %2.1f& "
+            print("%2.1f& %2.1f & %2.1f & %1.2f& "
             "%0.3f \\\\" %( 100*am['success rate'][0], am['mean travel distance'][0], am['rwse_10s'][0],
                             am['average absolute average velocity'][0],am['acceleration distribution divergence'][0] ))
             return
@@ -88,7 +88,7 @@ def latex_print(am, light=False):
         return
     
     print("%2.1f \\scriptstyle\\pm %2.1f & %2.1f \\scriptstyle\\pm %2.1f & "
-        "%1.2f \\scriptstyle\\pm %1.2f & %2.1f \\scriptstyle\\pm %1.1f & "
+        "%2.1f \\scriptstyle\\pm %1.1f & %1.2f \\scriptstyle\\pm %1.2f & "
         "%0.3f \\scriptstyle\\pm %0.3f \\\\" %( 100*am['success rate'][0], 100*am['success rate'][1],
                am['mean travel distance'][0] , am['mean travel distance'][1]  ,
                am['rwse_10s'][0] , am['rwse_10s'][1]  ,

@@ -142,7 +142,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', choices=['A', 'B'])
-    parser.add_argument('--epochs', type=int, default=1000)
+    parser.add_argument('--epochs', type=int, default=500)
     parser.add_argument('--test', type=str, help='path to config file to run final training on')
     parser.add_argument('--test_seeds', type=int, default=5)
     parser.add_argument('--test_cpus', type=int, help='number of cpus available to split test seed training over')
@@ -163,9 +163,9 @@ if __name__ == '__main__':
                 'policy': {
                     'learning_rate': 3e-4, 
                     'learning_rate_decay': tune.grid_search([0.999, 1.0]), 
-                    'hidden_layer_size': tune.grid_search([10, 20, 40, 80]),
-                    'n_hidden_layers': tune.grid_search([2, 3, 4]), 
-                    'activation':0,
+                    'hidden_layer_size': tune.grid_search([10, 20, 40]),
+                    'n_hidden_layers': tune.grid_search([2, 3]), 
+                    'activation':tune.grid_search([0, 1]),
                 },
                 'train_epochs': args.epochs,
                 'seed': 0,
@@ -210,3 +210,5 @@ if __name__ == '__main__':
             check_dir = analysis._checkpoints[i]['logdir']
             shutil.copyfile(os.path.join(check_dir,'policy_final.pt'), 
                 os.path.join(savepath, f'policy_seed{s}.pt'))
+            shutil.copyfile(os.path.join(check_dir,'params.json'),
+                os.path.join(savepath, 'config.json')) # copy config automatically
