@@ -87,10 +87,11 @@ class IDMRulePolicy(BaseAlgorithm):
         assert target_speed>0, 'negative target speed'
         self.v_max = target_speed
         self.a_max = np.array([3.]) # nominal acceleration
-        self.tau = 1 # desired time headway
+        self.tau = 0.5 # desired time headway
         self.b_pref = 2.5 # preferred deceleration
-        self.d_min = 5 #minimum spacing
-        # self.delta_psi = 40 # [degree] max deviation in orientation to be mapped onto
+        self.d_min = 3 #minimum spacing
+        self.max_pos_error = 2 # m, for matching vehicles to ego path
+        self.max_deg_error = 30 # degree, for matching vehicles to ego path
 
         # for np.remainder nan warnings
         np.seterr(invalid='ignore')
@@ -129,19 +130,12 @@ class IDMRulePolicy(BaseAlgorithm):
         full_state = self._env._env.projected_state.numpy() #(nv, 5)
         ego_state = full_state[agent] # (5,)
         v_ego = ego_state[2]
-        # xy = full_state[:,0:2] # (nv, 2)
         v = full_state[:,2:3] # (nv, 1)
-        # psi = full_state[:,3:4] # (nv, 1)
 
         length = 20
-        step = 0.5
+        step = 0.1
         x, y = self._env._env._generate_paths(delta=step, n=length/step, is_distance=True)
         heading = to_circle(np.arctan2(np.diff(y), np.diff(x)))
-        velocities = state[:,1]
-
-        # something like this could be done to also take future proximity of vehicles to ego path into account
-        # time_horizon = np.array(range(3))
-        # predictions = state[:,0:1] + np.outer(state[:,1], time_horizon)
 
         paths = np.stack([x[:,:-1],y[:,:-1], heading], axis=1) # (nv, 3, (path_length-1))
         ego_path = paths[agent:agent+1] # (1, 3, path_length-1)
@@ -153,10 +147,8 @@ class IDMRulePolicy(BaseAlgorithm):
         diff[:, 2, :] = to_circle(diff[:, 2, :])
 
         # Test if position and heading angle are close for some point on the future vehicle track
-        max_pos_error = 2
-        pos_close = np.sum(diff[:, 0:2, :]**2, 1) <= max_pos_error**2 # (nv, path_length-1)
-        max_deg_error = 30
-        heading_close = np.abs(diff[:, 2, :]) <= max_deg_error * np.pi / 180 # (nv, path_length-1)
+        pos_close = np.sum(diff[:, 0:2, :]**2, 1) <= self.max_pos_error**2 # (nv, path_length-1)
+        heading_close = np.abs(diff[:, 2, :]) <= self.max_deg_error * np.pi / 180 # (nv, path_length-1)
         # For all vehicles get the path points where they are close to the ego path
         close = np.logical_and(pos_close, heading_close) # (nv, path_length-1)
         close[agent, :] = False # exclude ego agent
@@ -174,27 +166,9 @@ class IDMRulePolicy(BaseAlgorithm):
                 leader = veh_id
                 min_idx = path_idx[0]
 
-        # alternative vectorized code
-        # def findfirst(a):
-        #     idx = np.argwhere(a)
-        #     if len(idx) == 0:
-        #         return np.NaN
-        #     else:
-        #         return float(idx[0]) # float conversion, to get a numpy array of dtype=float64
-        # d = np.apply_along_axis(findfirst, 1, close) # (nv)
-        # if np.all(np.isnan(d)):
-        #     leader = agent
-        # else:
-        #     leader = np.nanargmin(d)
-        #     path_idx = d[leader]
-        #     min_idx = np.sqrt(np.sum(diff[leader, 0:2, path_idx]**2))
-
-
         if leader != agent:
             # distance along ego path to point with closest distance
             d = step * min_idx
-            # add distance from ego path point with closest distance to actual vehicle position
-            d += np.sqrt(np.sum(diff[leader, 0:2, min_idx]**2))
 
             # Update environment interaction graph with leader
             self._env._env._graph._neighbor_dict={agent:[leader]}
