@@ -56,6 +56,10 @@ def main(track:int, loc:int=0):
 
     torch.save(expert_data, f'intersimple-expert-data-setobs2-loc{loc}-track{track}.pt')
 
+def loop(tracks:list=[0]):
+    for track in tracks:
+        main(track)
+
 if __name__=='__main__':
     import fire
-    fire.Fire(main)
+    fire.Fire(loop)
