@@ -6,7 +6,7 @@ import json
 
 activations = [torch.nn.Tanh, torch.nn.LeakyReLU]
 
-def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=False):
+def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=False, save_videos:bool=False, videos_folder:str='videos'):
     
     exclude_keys_from_policy_kwargs = {'learning_rate', 'learning_rate_decay', 'clip_ratio', 'iterations_per_epoch', 'option'}
     policy_kwargs = {}
@@ -50,7 +50,8 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
                                 policy_file=policy_file, 
                                 policy_kwargs=policy_kwargs,
                                 env=env, 
-                                env_kwargs=env_kwargs)
+                                env_kwargs=env_kwargs,
+                                videos_folder=None if not save_videos else videos_folder)
         outfolder = os.path.dirname(outbase)
     else:
         locstr = 'loc_'+'_'.join([f'r{ro}t{tr}' for (ro,tr) in locations])
