@@ -19,53 +19,28 @@ The INTERACTION dataset contains a two folders which should be copied into a fol
   - the contents of `recorded_trackfiles` should be copied to `./InteractionSimulator/datasets/trackfiles`
   - the contents of `maps` should be copied to `./InteractionSimulator/datasets/maps`
 
-## Processing, saving, and loading expert demos
-Once the repository has been set up, you can process and save expert track demonstrations with:
+## Processing and saving expert demos
+Once the repository has been set up, you need to generate two separate sets of expert demos for tracks 0-4. The first command generates true joint and individual states and actions, necessary for evaluating. The second command generates trajectory rollouts according to individual agent observations, which will be used in behavior cloning, along with gail/hail/shail discriminators.
 ```
-python src/expert_data.py --loc [LOCNUM] --track [TRACKNUM]
-```
-You can (and should) process all tracks at once at location 0 with:
-```
-python src/expert_data.py --all-tracks
-```
-
-You can then train a default behavior cloning policy with the following. Be sure to check help for main.py for running options.
-```
-python src/main.py --train
-```
-You can run tensorboard by running the following and opening `localhost:6006` (or alternatively port-forwarding 6006 from the remote server)
-```
-tensorboard --logdir output/
-```
-You can then test the learned policy with the following, and see the animation file in `output/`:
-```
-python src/main.py --test
+python -m src.expert --locs='[DR_USA_Roundabout_FT]' --tracks='[0,1,2,3,4]'
+python -m intersimple-expert-rollout-setobs2 --tracks='[0,1,2,3,4]'
 ```
 
 
-You can load the experts actions manually
-```
-from src import expert_data
-observations, actions = expert_data.load_expert_data(loc = [LOCNUM], track = [TRACKNUM])
-for (s, a) in zip (observations, actions):
-    # do some imitation learning
-```
+## Tuning hyperparameters and training finalized models
+To tune models, we use `ray[tune]` grid searches. You can run see the commands we used to train in the top half of `train_models.sh`. After training the models, configurations get saved in `best_configs/`. However, we note some better performance manually at earlier epochs of training, so we adjusted our `best_configs` manually.
+
+After the `best_configs/` are set, we rereun each configuration with multiple seeds, the commands to do so are in the bottom half of `train_models.sh`. This saves different policy files to `test_policies/`.
+
+
+## Evaluating models
+To evaluate the learned policies, we rerun each model in particular setting, evaluate all our metrics, and average over different trained model seeds. The commands to do so are in `evaluate_models.sh`. 
 
 
 ## Package Structure
 ```
 InteractionImitation
-|- demos
-|- algorithms
-   |- BC
-   |- AdVIL
-|- nets
-   |- Encoder
-   |- DeepSet
-   |- Decoder
-|- policies
-|- discriminators
-|- demo_generators
+|- TODO
 ```
 
 ## Type Definitions
