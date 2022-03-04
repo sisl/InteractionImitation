@@ -5,6 +5,7 @@ import intersim
 from intersim.envs import Intersimple
 from stable_baselines3.common.base_class import BaseAlgorithm
 from src.baselines import IDMRulePolicy
+from src.data.expert import NormalizedIntersimpleExpert
 from src.evaluation import IntersimpleEvaluation
 import src.gail.options as options_envs
 from src.evaluation.metrics import divergence, visualize_distribution, rwse
@@ -40,6 +41,8 @@ def load_policy(method:str,
     ml = torch.device('cpu') if not torch.cuda.is_available() else None
     if method == 'idm':
         policy = IDMRulePolicy(env, **policy_kwargs)
+    elif method == 'expert_agent':
+        policy = NormalizedIntersimpleExpert(env, **policy_kwargs)
     elif method == 'bc':
         policy = SetPolicy(env.action_space.shape[-1], **policy_kwargs)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
