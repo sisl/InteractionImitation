@@ -10,6 +10,7 @@ from src.util.wrappers import IntersimpleTimeLimit
 from src.options.envs import OptionsEnv
 from src.safe_options.options import SafeOptionsEnv
 from src.evaluation.vec_env import CallbackWhenDoneVecEnv
+import matplotlib.pyplot as plt
 
 class IntersimpleEvaluation:
     """
@@ -156,6 +157,7 @@ class IntersimpleEvaluation:
         agent = info['agent']
         filestr = os.path.join(self.videos_folder, f'agent{agent}')
         self.env.close(filestr=filestr)
+        plt.close('all')
     
     def post_proc(self):
         """
