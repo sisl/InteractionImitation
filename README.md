@@ -1,10 +1,22 @@
 # InteractionImitation
-Imitation Learning with the INTERACTION Dataset
+Imitation Learning with the [Interaction Dataset](https://interaction-dataset.com/) via the [InteractionSimulator](https://github.com/sisl/InteractionSimulator) gym environments.
+
+Code for "[SHAIL: Safety-Aware Hierarchical Adversarial Imitation Learning for Autonomous Driving in Urban Environments](https://arxiv.org/abs/2204.01922)".
+If you find this repository useful, please cite the paper:
+
+```
+@article{jamgochian2022shail,
+  author = {Arec Jamgochian and Etienne Buehrle and Johannes Fischer and Mykel J. Kochenderfer},
+  title = {{SHAIL}: Safety-Aware Hierarchical Adversarial Imitation Learning for Autonomous Driving in Urban Environments},
+  journal = {arXiv:2204.01922 [cs]},
+  year = {2022}
+}
+```
 
 ## Getting started
-Clone InteractionSimulator and pip install the module.
+Clone the `InteractionSimulator` with the `shail` tag and pip install the module.
 ```
-git clone https://github.com/sisl/InteractionSimulator.git
+git clone --branch shail https://github.com/sisl/InteractionSimulator.git
 cd InteractionSimulator
 pip install -e .
 cd ..
