@@ -18,11 +18,11 @@ python shail-experiment.py --train B
 # Experiment A
 python bc-experiment.py --test best_configs/bc_expA.json
 python gail-experiment.py --test best_configs/gail_expA.json
-python shail-experiment.py --train best_configs/hail_expA.json
-python shail-experiment.py --train best_configs/shail_expA.json
+python shail-experiment.py --test best_configs/hail_expA.json
+python shail-experiment.py --test best_configs/shail_expA.json
 
 # Experiment B
 python bc-experiment.py --test best_configs/bc_expB.json
 python gail-experiment.py --test best_configs/gail_expB.json
-python shail-experiment.py --train best_configs/hail_expB.json
-python shail-experiment.py --train best_configs/shail_expB.json
+python shail-experiment.py --test best_configs/hail_expB.json
+python shail-experiment.py --test best_configs/shail_expB.json

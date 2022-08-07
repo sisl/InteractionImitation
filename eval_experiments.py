@@ -12,16 +12,16 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
     policy_kwargs = {}
 
     if method in ['expert', 'idm']:
-        env, env_kwargs ='NRasterizedRouteIncrementingAgent', {}
+        env, env_kwargs ='NRasterizedRouteIncrementingAgent', {'use_idm':True}
     elif method in ['bc','gail']:
         env='NormalizedContinuousEvalEnv' 
-        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000}
+        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000, 'use_idm':True}
     elif method in ['hail']:
         env = 'NormalizedSafeOptionsEvalEnv'
-        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000, 'safe_actions_collision_method': None, 'abort_unsafe_collision_method': None}
+        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000, 'safe_actions_collision_method': None, 'abort_unsafe_collision_method': None, 'use_idm':True}
     elif method in ['shail']:
         env = 'NormalizedSafeOptionsEvalEnv'
-        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000}
+        env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000, 'use_idm':True}
     else:
         raise NotImplementedError
 

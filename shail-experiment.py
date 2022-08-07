@@ -58,6 +58,7 @@ def training_function(config):
                 ),
                 check_collisions=True,
                 stop_on_collision=config['trainenv']['stop_on_collision'],
+                use_idm=config['trainenv']['use_idm'],
             ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
             ), options=option_list[config['policy']['option']],
             safe_actions_collision_method=config['trainenv']['safe_actions_collision_method'], 
@@ -73,7 +74,9 @@ def training_function(config):
                     collision_penalty=0
                 ),
                 check_collisions=True,
-                stop_on_collision=config['trainenv']['stop_on_collision'], track=track,
+                stop_on_collision=config['trainenv']['stop_on_collision'], 
+                use_idm=config['trainenv']['use_idm'], 
+                track=track,
             ), collision_distance=6, collision_penalty=100), lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10))
             ), options=option_list[config['policy']['option']],
             safe_actions_collision_method=config['trainenv']['safe_actions_collision_method'], 
@@ -180,6 +183,7 @@ if __name__ == '__main__':
                     'stop_on_collision': False, 
                     'safe_actions_collision_method': 'circle', 
                     'abort_unsafe_collision_method': 'circle',
+                    'use_idm':True,
                 },
                 'policy': {
                     'learning_rate': 3e-4, 
