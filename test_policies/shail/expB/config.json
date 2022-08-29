@@ -1,33 +1,34 @@
 {
-    "experiment": "B",
-    "trainenv": {
-        "stop_on_collision": false,
-        "safe_actions_collision_method": "circle",
-        "abort_unsafe_collision_method": "circle"
-    },
-    "policy": {
-        "learning_rate": 0.0003,
-        "learning_rate_decay": 1.0,
-        "clip_ratio": 0.2,
-        "iterations_per_epoch": 100,
-        "hidden_layer_size": 20,
-        "n_hidden_layers": 2,
-        "activation": 0,
-        "option": 0
-    },
-    "value": {
-        "learning_rate": 0.001,
-        "iterations_per_epoch": 1000
-    },
-    "discriminator": {
-        "learning_rate": 0.001,
-        "weight_decay": 0.0001,
-        "iterations_per_epoch": 100,
-        "n_hidden_layers_element": 4,
-        "n_hidden_layers_global": 2,
-        "hidden_layer_size": 10,
-        "activation": 0
-    },
-    "train_epochs": 85,
-    "seed": 0
+  "discriminator": {
+    "activation": 0,
+    "hidden_layer_size": 10,
+    "iterations_per_epoch": 100,
+    "learning_rate": 0.001,
+    "n_hidden_layers_element": 4,
+    "n_hidden_layers_global": 2,
+    "weight_decay": 0.0001
+  },
+  "experiment": "B",
+  "policy": {
+    "activation": 0,
+    "clip_ratio": 0.2,
+    "hidden_layer_size": 20,
+    "iterations_per_epoch": 100,
+    "learning_rate": 0.0003,
+    "learning_rate_decay": 1.0,
+    "n_hidden_layers": 2,
+    "option": 0
+  },
+  "seed": 3,
+  "train_epochs": 85,
+  "trainenv": {
+    "abort_unsafe_collision_method": "circle",
+    "safe_actions_collision_method": "circle",
+    "stop_on_collision": false,
+    "use_idm": true
+  },
+  "value": {
+    "iterations_per_epoch": 1000,
+    "learning_rate": 0.001
+  }
 }
