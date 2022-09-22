@@ -11,8 +11,10 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
     exclude_keys_from_policy_kwargs = {'learning_rate', 'learning_rate_decay', 'clip_ratio', 'iterations_per_epoch', 'option'}
     policy_kwargs = {}
 
-    if method in ['expert', 'expert_agent', 'idm']:
+    if method in ['expert', 'expert_agent']:
         env, env_kwargs ='NRasterizedRouteIncrementingAgent', {}
+    elif method in ['idm']:
+        env, env_kwargs ='NRasterizedRouteIncrementingAgent', {'use_idm':True}
     elif method in ['bc','gail']:
         env='NormalizedContinuousEvalEnv' 
         env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000, 'use_idm':True}
