@@ -5,13 +5,22 @@ class Wrapper(gym.Wrapper):
     def __getattr__(self, name):
         return getattr(self.env, name)
 
+    def close(self, *args, **kwargs):
+        return self.env.close(*args, **kwargs)
+
 class TransformObservation(gym.wrappers.TransformObservation):
     def __getattr__(self, name):
         return getattr(self.env, name)
 
+    def close(self, *args, **kwargs):
+        return self.env.close(*args, **kwargs)
+
 class IntersimpleTimeLimit(gym.wrappers.TimeLimit):
     def __getattr__(self, name):
         return getattr(self.env, name)
+
+    def close(self, *args, **kwargs):
+        return self.env.close(*args, **kwargs)
 
 class CollisionPenaltyWrapper(Wrapper):
 

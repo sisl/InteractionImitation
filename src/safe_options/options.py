@@ -225,8 +225,8 @@ class SafeOptionsEnv(OptionsEnv):
         }
         return obs
 
-    def step(self, action, render_mode=None):
-        obs, reward, done, info = super().step(action, render_mode)
+    def step(self, action):
+        obs, reward, done, info = super().step(action)
         obs = {
             'observation': obs,
             'safe_actions': self.safe_actions(),

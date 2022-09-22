@@ -5,6 +5,7 @@ import intersim
 from intersim.envs import Intersimple
 from stable_baselines3.common.base_class import BaseAlgorithm
 from src.baselines import IDMRulePolicy
+from src.data.expert import NormalizedIntersimpleExpert
 from src.evaluation import IntersimpleEvaluation
 import src.gail.options as options_envs
 from src.evaluation.metrics import divergence, visualize_distribution, rwse
@@ -40,6 +41,8 @@ def load_policy(method:str,
     ml = torch.device('cpu') if not torch.cuda.is_available() else None
     if method == 'idm':
         policy = IDMRulePolicy(env, **policy_kwargs)
+    elif method == 'expert_agent':
+        policy = NormalizedIntersimpleExpert(env, **policy_kwargs)
     elif method == 'bc':
         policy = SetPolicy(env.action_space.shape[-1], **policy_kwargs)
         policy.load_state_dict(torch.load(policy_file, map_location=ml))
@@ -177,7 +180,8 @@ def evaluate_policy(locations:List[Tuple[int,int]],
     env_kwargs:dict,
     method: str,
     policy_file: str,
-    policy_kwargs:dict) -> List[Dict[str,list]]:
+    policy_kwargs:dict,
+    videos_folder: Optional[str] = None) -> List[Dict[str,list]]:
     """
     Evaluate policy on an incrementing agent environment at all locations. 
     Return metrics for that policy
@@ -230,7 +234,13 @@ def evaluate_policy(locations:List[Tuple[int,int]],
         policy = load_policy(method, policy_file, policy_kwargs, eval_env)
 
         # run policy on environment
-        policy_metrics[i] = evaluator.evaluate(policy)
+        policy_videos_folder = None
+        if videos_folder is not None:
+            policy_videos_folder = os.path.join(videos_folder, method, f'loc{iround}', f'track{track}')
+            os.makedirs(policy_videos_folder, exist_ok=True)
+        policy_metrics[i] = evaluator.evaluate(
+            policy, videos_folder=policy_videos_folder
+        )
     
     return policy_metrics
         
@@ -364,7 +374,8 @@ def eval_main(
     policy_kwargs: dict={},
     env: str='NRasterizedRouteIncrementingAgent', 
     env_kwargs: dict={},
-    seed: int=0):
+    seed: int=0,
+    videos_folder: Optional[str]=None):
     """
     Test a particular model at different testing locations/tracks and compute average metrics 
     over all files. 
@@ -410,7 +421,7 @@ def eval_main(
     else:
 
         # evaluate it on the given roundabouts
-        policy_metrics = evaluate_policy(locations, env, env_kwargs, method, policy_file, policy_kwargs)
+        policy_metrics = evaluate_policy(locations, env, env_kwargs, method, policy_file, policy_kwargs, videos_folder=videos_folder)
         smetrics = summary_metrics(policy_metrics)
         save_metrics(smetrics, outbase+'_summary.pkl')
         cmetrics = comparison_metrics(policy_metrics, expert_metrics, outbase=outbase)

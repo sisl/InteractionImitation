@@ -9,6 +9,8 @@ from tqdm import tqdm
 from src.util.wrappers import IntersimpleTimeLimit
 from src.options.envs import OptionsEnv
 from src.safe_options.options import SafeOptionsEnv
+from src.evaluation.vec_env import CallbackWhenDoneVecEnv
+import matplotlib.pyplot as plt
 
 class IntersimpleEvaluation:
     """
@@ -80,7 +82,7 @@ class IntersimpleEvaluation:
         with open(filestr, 'wb') as f:
             pickle.dump(self._metrics, f)     
 
-    def evaluate(self, policy, filestr: Optional[str] = None) -> Dict[str, list]:
+    def evaluate(self, policy, filestr: Optional[str] = None, videos_folder: Optional[str] = None) -> Dict[str, list]:
         """
         Evaluate a policy on the incrementing agent evaluation environment
         
@@ -88,6 +90,8 @@ class IntersimpleEvaluation:
             policy (BaseClass.BaseAlgorithm): policy in which policy.predict(observation)[0] returns an action
             filestr (str): path-like string to dump metrics to or None
         """
+        self.videos_folder = videos_folder
+
         self.reset()
         if self.use_pbar:
             self.pbar = tqdm(total=self.n_episodes)
@@ -97,10 +101,11 @@ class IntersimpleEvaluation:
 
         evaluate_policy(
             policy, 
-            self.env,
+            self.env if self.videos_folder is None else CallbackWhenDoneVecEnv([lambda: self.env], self.done_callback),
             n_eval_episodes=self.n_episodes,
             callback=self.evaluate_options_policy_callback if self.is_options_env else self.evaluate_policy_callback,
-            return_episode_rewards=False
+            return_episode_rewards=False,
+            render=self.videos_folder is not None,
         )
         if self.use_pbar:
             self.pbar.close()
@@ -145,6 +150,14 @@ class IntersimpleEvaluation:
         
         if done and self.use_pbar:
             self.pbar.update(1)
+        
+    def done_callback(self, info):
+        if self.is_options_env:
+            info = info['ll']['infos'][0]
+        agent = info['agent']
+        filestr = os.path.join(self.videos_folder, f'agent{agent}')
+        self.env.close(filestr=filestr)
+        plt.close('all')
     
     def post_proc(self):
         """

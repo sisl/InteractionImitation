@@ -6,13 +6,13 @@ import json
 
 activations = [torch.nn.Tanh, torch.nn.LeakyReLU]
 
-def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=False):
+def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=False, save_videos:bool=False, videos_folder:str='videos', first_seed_only:bool=False):
     
     exclude_keys_from_policy_kwargs = {'learning_rate', 'learning_rate_decay', 'clip_ratio', 'iterations_per_epoch', 'option'}
     policy_kwargs = {}
 
-    if method in ['expert', 'idm']:
-        env, env_kwargs ='NRasterizedRouteIncrementingAgent', {'use_idm':True}
+    if method in ['expert', 'expert_agent', 'idm']:
+        env, env_kwargs ='NRasterizedRouteIncrementingAgent', {}
     elif method in ['bc','gail']:
         env='NormalizedContinuousEvalEnv' 
         env_kwargs={'stop_on_collision':True, 'max_episode_steps':1000, 'use_idm':True}
@@ -30,8 +30,13 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
     if folder is not None:
         files = [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]
         files = [f for f in files if f.endswith('.pt')]
+
+        if first_seed_only:
+            files = files[:1]
+
         with open(os.path.join(folder, 'config.json'), 'rb') as f:
             config = json.load(f)
+            
         print('%i policy files found in %s folder' %(len(files), folder))
         print('found policy config', config['policy'])
 
@@ -50,7 +55,8 @@ def main(method:str='expert', folder:str=None, locations=[(0,0)], skip_running=F
                                 policy_file=policy_file, 
                                 policy_kwargs=policy_kwargs,
                                 env=env, 
-                                env_kwargs=env_kwargs)
+                                env_kwargs=env_kwargs,
+                                videos_folder=None if not save_videos else videos_folder)
         outfolder = os.path.dirname(outbase)
     else:
         locstr = 'loc_'+'_'.join([f'r{ro}t{tr}' for (ro,tr) in locations])
