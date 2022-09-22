@@ -11,8 +11,8 @@ python -m eval_experiments --method shail --folder='test_policies/shail/expA'
 
 # Experiment B
 python -m eval_experiments --locations='[(0,4)]' 
-python -m eval_experiments --method idm --locations='[(0,4)]' --skip_running
-python -m eval_experiments --method bc --folder='test_policies/bc/expB' --locations='[(0,4)]' --skip_running
-python -m eval_experiments --method gail --folder='test_policies/gail/expB' --locations='[(0,4)]' --skip_running
-python -m eval_experiments --method hail --folder='test_policies/hail/expB' --locations='[(0,4)]' --skip_running
-python -m eval_experiments --method shail --folder='test_policies/shail/expB' --locations='[(0,4)]' --skip_running
+python -m eval_experiments --method idm --locations='[(0,4)]'
+python -m eval_experiments --method bc --folder='test_policies/bc/expB' --locations='[(0,4)]'
+python -m eval_experiments --method gail --folder='test_policies/gail/expB' --locations='[(0,4)]'
+python -m eval_experiments --method hail --folder='test_policies/hail/expB' --locations='[(0,4)]'
+python -m eval_experiments --method shail --folder='test_policies/shail/expB' --locations='[(0,4)]'
