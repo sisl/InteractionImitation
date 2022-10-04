@@ -172,6 +172,7 @@ class IDMRulePolicy(BaseAlgorithm):
 
             # Update environment interaction graph with leader
             self._env._env._graph._neighbor_dict={agent:[leader]}
+            self._env._update_graph = True
 
             delta_v = v_ego - v[leader, 0]
             d_des = self.d_min + self.tau * v_ego + v_ego * delta_v / (2* (self.a_max*self.b_pref)**0.5 )

@@ -53,6 +53,7 @@ def training_function(config):
                 ),
                 check_collisions=True,
                 stop_on_collision=config['trainenv']['stop_on_collision'],
+                use_idm=config['trainenv']['use_idm'],
             ), collision_distance=6, collision_penalty=100),
             lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10)
         )) for _ in range(60)]
@@ -67,6 +68,7 @@ def training_function(config):
                 ),
                 check_collisions=True,
                 stop_on_collision=config['trainenv']['stop_on_collision'],
+                use_idm=config['trainenv']['use_idm'],
                 track=track,
             ), collision_distance=6, collision_penalty=100),
             lambda obs: (obs - obs_min) / (obs_max - obs_min + 1e-10)
@@ -169,7 +171,8 @@ if __name__ == '__main__':
             config={
                 'experiment': args.train,
                 'trainenv': {
-                    'stop_on_collision': False, 
+                    'stop_on_collision': False,
+                    'use_idm': True, 
                 },
                 'policy': {
                     'learning_rate': 3e-4, 

@@ -45,6 +45,7 @@ class OptionsEnv(Wrapper):
         self.options = options
         self.action_space = gym.spaces.Discrete(len(options))
         self.max_plan_length = max(t for _, t in options)
+        self.render_mode = None
     
     def plan(self, option):
         target_v, t = option
@@ -84,11 +85,14 @@ class OptionsEnv(Wrapper):
         
         n_steps = k + 1
         return observations, actions, rewards, env_done, plan_done, infos, n_steps
+    
+    def render(self, mode='post'):
+        self.render_mode = mode
 
-    def step(self, action, render_mode=None):
+    def step(self, action):
         a = int(action)
         assert a == action
-        ll_obs, ll_actions, ll_rewards, ll_env_done, ll_plan_done, ll_infos, ll_steps = self.execute_plan(self.last_obs, self.options[a], render_mode)
+        ll_obs, ll_actions, ll_rewards, ll_env_done, ll_plan_done, ll_infos, ll_steps = self.execute_plan(self.last_obs, self.options[a], self.render_mode)
         hl_obs = ll_obs[ll_steps]
         hl_reward = (ll_rewards * ~ll_plan_done).sum().item()
         hl_done = ll_env_done[ll_steps-1].item()

@@ -1,7 +1,8 @@
 {
     "experiment": "A",
     "trainenv": {
-        "stop_on_collision": false
+        "stop_on_collision": false,
+        "use_idm": true
     },
     "policy": {
         "learning_rate": 0.0003,
