@@ -1,7 +1,7 @@
 # InteractionImitation
 Imitation Learning with the [Interaction Dataset](https://interaction-dataset.com/) via the [InteractionSimulator](https://github.com/sisl/InteractionSimulator) gym environments.
 
-Code for "[SHAIL: Safety-Aware Hierarchical Adversarial Imitation Learning for Autonomous Driving in Urban Environments](https://arxiv.org/abs/2204.01922)".
+Code for "[SHAIL: Safety-Aware Hierarchical Adversarial Imitation Learning for Autonomous Driving in Urban Environments](https://arxiv.org/abs/2204.01922)", which appeared at the 2023 International Conference on Robotics and Automation (ICRA).
 If you find this repository useful, please cite the paper:
 
 ```
